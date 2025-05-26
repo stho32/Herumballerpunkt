@@ -1,0 +1,117 @@
+body {
+    margin: 0;
+    padding: 0;
+    font-family: Arial, sans-serif;
+    background-color: #222;
+    color: white;
+    overflow: hidden;
+}
+
+#gameCanvas {
+    background-color: #4a5d3a;
+    display: block;
+    border: 2px solid #333;
+}
+
+#gameInfo {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    font-size: 20px;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+}
+
+#gameInfo div {
+    margin-bottom: 10px;
+}
+
+.health-bar {
+    display: inline-block;
+    width: 150px;
+    height: 20px;
+    background-color: #333;
+    border: 2px solid #fff;
+    margin-left: 10px;
+    vertical-align: middle;
+}
+
+.health-fill {
+    height: 100%;
+    background-color: #4f4;
+    transition: width 0.3s;
+}
+
+#gameOver {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: rgba(0, 0, 0, 0.9);
+    padding: 30px;
+    border-radius: 10px;
+    text-align: center;
+    display: none;
+}
+
+#gameOver h2 {
+    margin-top: 0;
+    font-size: 36px;
+    color: #f44;
+}
+
+#gameOver button {
+    padding: 10px 30px;
+    font-size: 18px;
+    background-color: #4a4;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-top: 20px;
+}
+
+#gameOver button:hover {
+    background-color: #5b5;
+}
+
+#instructions {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    font-size: 14px;
+    opacity: 0.8;
+}
+
+.wave-message {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 48px;
+    font-weight: bold;
+    color: #ff0;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+    display: none;
+    z-index: 100;
+}
+
+.bonus {
+    background-color: #44f !important;
+    animation: pulse 0.5s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.2); }
+}
+
+.fast {
+    background-color: #ff4 !important;
+    animation: move 2s linear infinite;
+}
+
+@keyframes move {
+    0% { transform: translateX(0); }
+    50% { transform: translateX(100px); }
+    100% { transform: translateX(0); }
+}

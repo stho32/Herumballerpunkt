@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2D Kampfspiel</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    
+    <div id="gameInfo">
+        <div>Punkte: <span id="score">0</span></div>
+        <div>Welle: <span id="wave">1</span></div>
+        <div>Leben: <span id="healthText">100/100</span>
+            <div class="health-bar">
+                <div class="health-fill" id="healthFill" style="width: 100%"></div>
+            </div>
+        </div>
+        <div id="bunkerHealth" style="display: none;">Bunker: <span id="bunkerHealthText">1000/1000</span>
+            <div class="health-bar">
+                <div class="health-fill" id="bunkerHealthFill" style="width: 100%; background-color: #484;"></div>
+            </div>
+        </div>
+        <div>Munition: <span id="ammo">30</span>/30</div>
+    </div>
+    
+    <div id="waveMessage" class="wave-message"></div>
+    
+    <div id="instructions">
+        WASD/Pfeiltasten: Bewegen | Maus: Zielen | Halten: Dauerfeuer | 1-5: Waffenwechsel | E: Fabrik erobern
+    </div>
+    
+    <div id="gameOver">
+        <h2>Spiel vorbei!</h2>
+        <p>Endpunktzahl: <span id="finalScore">0</span></p>
+        <p>Erreichte Welle: <span id="finalLevel">1</span></p>
+        <button onclick="restartGame()">Neues Spiel</button>
+    </div>
+    
+    <div id="soundToggle" style="position: absolute; top: 20px; right: 20px; font-size: 24px; cursor: pointer;" onclick="toggleSound()">
+        🔊
+    </div>
+
+    <!-- Game Scripts -->
+    <script src="js/audio.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/weapons.js"></script>
+    <script src="js/entities.js"></script>
+    <script src="js/structures.js"></script>
+    <script src="js/bunker.js"></script>
+    <script src="js/renderer.js"></script>
+    <script src="js/game.js"></script>
+    <div id="startScreen" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; background: rgba(0,0,0,0.8); padding: 40px; border-radius: 10px;">
+        <h1 style="color: #4f4; margin-bottom: 20px;">2D Kampfspiel</h1>
+        <p style="color: #fff; margin-bottom: 20px;">Wähle Schwierigkeit:</p>
+        <div style="margin-bottom: 20px;">
+            <button onclick="setDifficulty('easy')" style="padding: 10px 20px; margin: 5px; font-size: 18px; background-color: #4a4; color: white; border: none; border-radius: 5px; cursor: pointer;">Einfach</button>
+            <button onclick="setDifficulty('normal')" style="padding: 10px 20px; margin: 5px; font-size: 18px; background-color: #44a; color: white; border: none; border-radius: 5px; cursor: pointer;">Normal</button>
+            <button onclick="setDifficulty('hard')" style="padding: 10px 20px; margin: 5px; font-size: 18px; background-color: #a44; color: white; border: none; border-radius: 5px; cursor: pointer;">Schwer</button>
+        </div>
+        <button onclick="startGameWithAudio()" style="padding: 15px 40px; font-size: 24px; background-color: #4a4; color: white; border: none; border-radius: 5px; cursor: pointer;">START</button>
+        <br><br>
+        <button onclick="testSound()" style="padding: 10px 20px; font-size: 16px; background-color: #44f; color: white; border: none; border-radius: 5px; cursor: pointer;">Test Sound</button>
+    </div>
+    
+    <script>
+        // Initialize game manager
+        window.addEventListener('load', () => {
+            gameManager.init();
+        });
+        
+        function startGameWithAudio() {
+            // Hide start screen
+            document.getElementById('startScreen').style.display = 'none';
+            
+            // Initialize audio context
+            initAudio();
+            
+            // Start game
+            gameManager.startGame();
+            
+            // Test sound after a short delay
+            setTimeout(() => {
+                console.log('Testing audio...');
+                playSound('pickup', 0.1);
+            }, 500);
+        }
+        
+        function setDifficulty(level) {
+            gameManager.difficulty = level;
+            // Visual feedback
+            document.querySelectorAll('#startScreen button').forEach(btn => {
+                if (btn.textContent === 'Einfach' && level === 'easy') btn.style.backgroundColor = '#6c6';
+                else if (btn.textContent === 'Normal' && level === 'normal') btn.style.backgroundColor = '#66c';
+                else if (btn.textContent === 'Schwer' && level === 'hard') btn.style.backgroundColor = '#c66';
+                else if (btn.textContent === 'Einfach') btn.style.backgroundColor = '#4a4';
+                else if (btn.textContent === 'Normal') btn.style.backgroundColor = '#44a';
+                else if (btn.textContent === 'Schwer') btn.style.backgroundColor = '#a44';
+            });
+        }
+        
+        function restartGame() {
+            // Initialize audio if needed
+            initAudio();
+            gameManager.startGame();
+        }
+        
+        function testSound() {
+            console.log('Testing sound system...');
+            initAudio();
+            
+            // Test different sounds
+            setTimeout(() => playSound('shoot', 0.5), 100);
+            setTimeout(() => playSound('explosion', 0.5), 500);
+            setTimeout(() => playSound('pickup', 0.5), 900);
+            
+            // Check browser console
+            alert('Sound test started! Check browser console (F12) for messages.\n\nYou should hear 3 sounds:\n1. Shoot\n2. Explosion\n3. Pickup\n\nIf you hear nothing, check:\n- Browser volume\n- Allow audio in browser settings\n- Console for errors');
+        }
+    </script>
+</body>
+</html>

@@ -4,7 +4,10 @@ Ein intensives 2D-Shooter-Spiel, in dem du gegen Wellen von Feinden kämpfst, Fa
 
 ## [🎮 Jetzt Spielen!](https://stho32.github.io/Herumballerpunkt/)
 
-[🎮 Jetzt Spielen!](https://stho32.github.io/Herumballerpunkt/)
+![Screenshot](image.png)
+[Spiele es jetzt!](https://stho32.github.io/Herumballerpunkt/)
+
+
 
 ## Spielbeschreibung
 

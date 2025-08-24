@@ -68,6 +68,14 @@ class GameManager {
 
         // Elite Enemy System
         this.eliteManager = new EliteManager();
+
+        // Economy & Defense System
+        this.economyManager = new EconomyManager();
+        this.defenseManager = new DefenseManager(this.economyManager);
+        this.shopInterface = new ShopInterface(this.defenseManager, this.economyManager);
+        this.economyHUD = new EconomyHUD(this.economyManager);
+        this.economyInputHandler = new EconomyInputHandler(this.shopInterface, this.defenseManager, this.economyHUD);
+        this.defenseStructures = [];
         
         // Input
         this.keys = {};
@@ -92,8 +100,11 @@ class GameManager {
         // Keyboard
         document.addEventListener('keydown', (e) => {
             this.keys[e.key.toLowerCase()] = true;
+
+            // Economy system key handling
+            this.economyInputHandler.handleKeyPress(e.key);
         });
-        
+
         document.addEventListener('keyup', (e) => {
             this.keys[e.key.toLowerCase()] = false;
         });
@@ -102,11 +113,18 @@ class GameManager {
         this.canvas.addEventListener('mousemove', (e) => {
             this.mouse.x = e.clientX;
             this.mouse.y = e.clientY;
+
+            // Economy system mouse handling
+            this.economyInputHandler.handleMouseMove(e.clientX, e.clientY);
         });
         
-        this.canvas.addEventListener('mousedown', () => {
-            if (this.player) {
-                this.player.isFiring = true;
+        this.canvas.addEventListener('mousedown', (e) => {
+            // Economy system click handling first
+            if (!this.economyInputHandler.handleMouseClick(e.clientX, e.clientY, e.button)) {
+                // If not handled by economy system, handle as normal game input
+                if (this.player) {
+                    this.player.isFiring = true;
+                }
             }
             // Initialize audio on first interaction
             initAudio();
@@ -116,6 +134,12 @@ class GameManager {
             if (this.player) {
                 this.player.isFiring = false;
             }
+        });
+
+        // Right-click context menu handling
+        this.canvas.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            this.economyInputHandler.handleContextMenu(e.clientX, e.clientY);
         });
         
         // Weapon switching
@@ -150,6 +174,9 @@ class GameManager {
         this.spawnedPowerUps = [];
         this.activePowerUps.clear();
         this.hazardManager.clearAllHazards();
+        this.defenseStructures = [];
+        this.defenseManager.structures = [];
+        this.economyManager = new EconomyManager(); // Reset economy
         particles = [];
         
         // Hide game over
@@ -279,8 +306,9 @@ class GameManager {
             this.hazardManager.onWaveComplete();
             this.eliteManager.onWaveComplete();
 
-            // Give bonus points
+            // Give bonus points and money
             this.score += 100 * this.wave;
+            this.economyManager.addMoney(this.economyManager.baseIncome.waveComplete * this.wave, 'wave_complete');
             this.updateDisplay();
             
             // Always reorganize forces if there are factories with soldiers
@@ -549,6 +577,11 @@ class GameManager {
         // Update environmental hazards
         this.hazardManager.update(this);
 
+        // Update economy and defense systems
+        this.economyManager.update();
+        this.defenseManager.update([...this.enemies, ...this.enemySquads.flatMap(squad => squad.members)]);
+        this.defenseStructures = this.defenseManager.structures;
+
         // Update particles
         updateParticles();
         
@@ -640,12 +673,16 @@ class GameManager {
                             // Elite rewards
                             if (enemy.isElite) {
                                 this.score += enemy.config.scoreValue;
+                                this.economyManager.addMoney(this.economyManager.baseIncome.eliteKill, 'elite_kill');
                                 // 50% chance for power-up, 25% for rare weapon upgrade
                                 if (Math.random() < 0.5) {
                                     this.spawnPickup(enemy.x, enemy.y, false, true, false);
                                 } else if (Math.random() < 0.25) {
                                     this.pickups.push(createWeaponPickup(enemy.x, enemy.y, true)); // Rare upgrade
                                 }
+                            } else {
+                                // Regular enemy rewards
+                                this.economyManager.addMoney(this.economyManager.baseIncome.enemyKill, 'enemy_kill');
                             }
 
                             // Superboss rewards
@@ -1016,6 +1053,9 @@ class GameManager {
         // Draw environmental hazards
         this.hazardManager.render(this.ctx);
 
+        // Draw defense structures
+        this.defenseManager.render(this.ctx);
+
         // Draw particles
         particles.forEach(particle => this.renderer.drawParticle(particle));
         
@@ -1052,6 +1092,10 @@ class GameManager {
         
         // Draw bullets
         this.bullets.forEach(bullet => this.renderer.drawBullet(bullet));
+
+        // Draw economy HUD and shop interface
+        this.economyHUD.render(this.ctx);
+        this.shopInterface.render(this.ctx);
     }
     
     updateDisplay() {

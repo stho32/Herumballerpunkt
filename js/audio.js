@@ -273,6 +273,62 @@ function playSound(type, volume = 0.3) {
                 gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
                 oscillator.stop(now + 0.3);
                 break;
+
+            case 'build':
+                oscillator.type = 'square';
+                oscillator.frequency.setValueAtTime(440, now);
+                oscillator.frequency.exponentialRampToValueAtTime(880, now + 0.2);
+                oscillator.frequency.exponentialRampToValueAtTime(660, now + 0.4);
+                gainNode.gain.setValueAtTime(0.3, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+                oscillator.stop(now + 0.4);
+                break;
+
+            case 'turret_shoot':
+                oscillator.type = 'sawtooth';
+                oscillator.frequency.setValueAtTime(200, now);
+                oscillator.frequency.exponentialRampToValueAtTime(400, now + 0.1);
+                gainNode.gain.setValueAtTime(0.2, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                oscillator.stop(now + 0.1);
+                break;
+
+            case 'structure_destroyed':
+                oscillator.type = 'sawtooth';
+                oscillator.frequency.setValueAtTime(800, now);
+                oscillator.frequency.exponentialRampToValueAtTime(100, now + 0.6);
+                gainNode.gain.setValueAtTime(0.4, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.6);
+                oscillator.stop(now + 0.6);
+                break;
+
+            case 'repair':
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(880, now);
+                oscillator.frequency.exponentialRampToValueAtTime(1320, now + 0.2);
+                gainNode.gain.setValueAtTime(0.2, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+                oscillator.stop(now + 0.2);
+                break;
+
+            case 'tesla':
+                oscillator.type = 'square';
+                oscillator.frequency.setValueAtTime(1500, now);
+                oscillator.frequency.exponentialRampToValueAtTime(3000, now + 0.05);
+                oscillator.frequency.exponentialRampToValueAtTime(500, now + 0.2);
+                gainNode.gain.setValueAtTime(0.3, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+                oscillator.stop(now + 0.2);
+                break;
+
+            case 'sell':
+                oscillator.type = 'triangle';
+                oscillator.frequency.setValueAtTime(1320, now);
+                oscillator.frequency.exponentialRampToValueAtTime(660, now + 0.3);
+                gainNode.gain.setValueAtTime(0.3, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                oscillator.stop(now + 0.3);
+                break;
                 
             default:
                 // Default sound for unknown types

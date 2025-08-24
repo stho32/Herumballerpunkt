@@ -17,6 +17,9 @@ class GameManager {
         this.waveEnemies = [];
         this.animationId = null;
         this.difficulty = 'normal'; // easy, normal, hard
+        this.gameStartTime = null;
+        this.lastAutoSave = 0;
+        this.autoSaveInterval = 30000; // Auto-save every 30 seconds
         
         // Difficulty multipliers
         this.difficultyMultipliers = {
@@ -123,10 +126,22 @@ class GameManager {
         this.wave = 1;
         this.waveActive = false;
         this.difficulty = difficulty;
-        
+        this.gameStartTime = Date.now();
+        this.lastAutoSave = Date.now();
+
+        // Initialize save system managers
+        if (!window.storageManager) {
+            window.storageManager = new StorageManager();
+        }
+
+        // Track game start
+        if (window.statisticsTracker) {
+            window.statisticsTracker.trackEvent('gameStart', { difficulty: difficulty });
+        }
+
         // Create player
         this.player = new Player(this.canvas.width / 2, this.canvas.height / 2);
-        
+
         // Clear all entities
         this.enemies = [];
         this.allies = [];
@@ -136,13 +151,14 @@ class GameManager {
         this.bullets = [];
         this.pickups = [];
         particles = [];
-        
+        this.bunker = null;
+
         // Hide game over
         document.getElementById('gameOver').style.display = 'none';
-        
+
         // Start first wave
         setTimeout(() => this.startWave(), 1000);
-        
+
         this.updateDisplay();
         this.gameLoop();
     }
@@ -242,15 +258,31 @@ class GameManager {
     
     checkWaveComplete() {
         const enemiesLeft = this.enemies.filter(e => !(e instanceof Ally)).length + this.enemySquads.length;
-        
+
         if (this.waveActive && enemiesLeft === 0) {
             this.waveActive = false;
+
+            // Track wave completion
+            if (window.statisticsTracker) {
+                window.statisticsTracker.trackEvent('waveEnd', { wave: this.wave });
+            }
+
             this.wave++;
-            
+
             // Give bonus points
             this.score += 100 * this.wave;
             this.updateDisplay();
-            
+
+            // Check achievements after wave completion
+            if (window.achievementManager && window.statisticsTracker) {
+                const gameState = window.statisticsTracker.getCurrentGameState();
+                const statistics = window.statisticsTracker.getAllStatistics();
+                window.achievementManager.checkAchievements(gameState, statistics);
+            }
+
+            // Auto-save after wave completion
+            this.performAutoSave();
+
             // Always reorganize forces if there are factories with soldiers
             const hasFactoriesWithSoldiers = this.factories.some(f => f.isAlly && f.soldiers > 0);
             if (hasFactoriesWithSoldiers) {
@@ -376,7 +408,12 @@ class GameManager {
     
     updateGame() {
         if (!this.gameActive) return;
-        
+
+        // Auto-save check
+        if (Date.now() - this.lastAutoSave >= this.autoSaveInterval) {
+            this.performAutoSave();
+        }
+
         // Update player
         this.player.update(this.keys, this.mouse, this.walls);
         
@@ -1003,7 +1040,23 @@ class GameManager {
     endGame() {
         this.gameActive = false;
         cancelAnimationFrame(this.animationId);
-        
+
+        // Track game end statistics
+        if (window.statisticsTracker) {
+            window.statisticsTracker.trackEvent('gameEnd', {
+                score: this.score,
+                wave: this.wave,
+                difficulty: this.difficulty
+            });
+        }
+
+        // Check achievements
+        if (window.achievementManager && window.statisticsTracker) {
+            const gameState = window.statisticsTracker.getCurrentGameState();
+            const statistics = window.statisticsTracker.getAllStatistics();
+            window.achievementManager.checkAchievements(gameState, statistics);
+        }
+
         document.getElementById('finalScore').textContent = this.score;
         document.getElementById('finalLevel').textContent = this.wave;
         document.getElementById('gameOver').style.display = 'block';
@@ -1042,6 +1095,141 @@ class GameManager {
         msg.textContent = `${upgrade.name} aktiviert!`;
         msg.style.display = 'block';
         setTimeout(() => { msg.style.display = 'none'; }, 2000);
+    }
+
+    performAutoSave() {
+        if (!window.storageManager) return;
+
+        try {
+            const gameData = this.getGameStateForSave();
+            const result = window.storageManager.saveGame('auto', gameData);
+
+            if (result.success) {
+                console.log('Auto-save successful');
+            } else {
+                console.warn('Auto-save failed:', result.message);
+            }
+
+            this.lastAutoSave = Date.now();
+        } catch (error) {
+            console.error('Auto-save error:', error);
+        }
+    }
+
+    getGameStateForSave() {
+        return {
+            wave: this.wave,
+            score: this.score,
+            difficulty: this.difficulty,
+            player: this.player,
+            allies: this.allies,
+            enemies: this.enemies.filter(e => !(e instanceof Ally)),
+            factories: this.factories,
+            turrets: this.turrets,
+            walls: this.walls,
+            bunker: this.bunker,
+            startTime: this.gameStartTime,
+            gameTime: Date.now() - this.gameStartTime
+        };
+    }
+
+    loadGameState(gameState) {
+        try {
+            this.wave = gameState.wave || 1;
+            this.score = gameState.score || 0;
+            this.difficulty = gameState.difficulty || 'normal';
+
+            // Restore player
+            if (gameState.player) {
+                this.player = new Player(gameState.player.x, gameState.player.y);
+                this.player.health = gameState.player.health;
+                this.player.maxHealth = gameState.player.maxHealth;
+                this.player.upgradeCount = gameState.player.upgradeCount || 0;
+
+                // Restore weapon system
+                if (gameState.player.weaponSystem) {
+                    this.player.weaponSystem.currentWeapon = gameState.player.weaponSystem.currentWeapon || 0;
+                    if (gameState.player.weaponSystem.weapons) {
+                        gameState.player.weaponSystem.weapons.forEach((weapon, index) => {
+                            if (this.player.weaponSystem.weapons[index]) {
+                                this.player.weaponSystem.weapons[index].ammo = weapon.ammo;
+                            }
+                        });
+                    }
+                }
+            }
+
+            // Clear and restore entities
+            this.allies = [];
+            this.enemies = [];
+            this.factories = [];
+            this.turrets = [];
+            this.walls = [];
+            this.bullets = [];
+            this.pickups = [];
+
+            // Restore bunker
+            if (gameState.bunker) {
+                this.bunker = new BunkerComplex(gameState.bunker.x, gameState.bunker.y);
+                this.bunker.level = gameState.bunker.level;
+                this.bunker.health = gameState.bunker.health;
+                this.bunker.maxHealth = gameState.bunker.maxHealth;
+                // Note: Full bunker restoration would need more complex logic
+            }
+
+            // Restore game timing
+            this.gameStartTime = gameState.startTime || Date.now();
+
+            // Update display
+            this.updateDisplay();
+
+            console.log('Game state loaded successfully');
+            return true;
+        } catch (error) {
+            console.error('Failed to load game state:', error);
+            return false;
+        }
+    }
+
+    // Event tracking helpers
+    trackKill(source, weapon, target) {
+        if (window.statisticsTracker) {
+            window.statisticsTracker.trackEvent('kill', {
+                source: source,
+                weapon: weapon,
+                target: target
+            });
+        }
+    }
+
+    trackDamage(target, amount, source) {
+        if (window.statisticsTracker) {
+            window.statisticsTracker.trackEvent('damage', {
+                target: target,
+                amount: amount,
+                source: source
+            });
+        }
+    }
+
+    trackUpgrade(type) {
+        if (window.statisticsTracker) {
+            window.statisticsTracker.trackEvent('upgrade', {
+                type: type
+            });
+        }
+    }
+
+    trackFactoryCapture() {
+        if (window.statisticsTracker) {
+            window.statisticsTracker.trackEvent('factoryCapture');
+        }
+    }
+
+    trackBunkerBuild() {
+        if (window.statisticsTracker) {
+            window.statisticsTracker.trackEvent('bunkerBuild');
+        }
     }
 }
 

@@ -131,7 +131,58 @@ function playSound(type, volume = 0.3) {
                 gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
                 oscillator.stop(now + 0.5);
                 break;
-                
+
+            case 'pause':
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(300, now);
+                oscillator.frequency.exponentialRampToValueAtTime(200, now + 0.2);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+                oscillator.stop(now + 0.2);
+                break;
+
+            case 'resume':
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(200, now);
+                oscillator.frequency.exponentialRampToValueAtTime(500, now + 0.3);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                oscillator.stop(now + 0.3);
+                break;
+
+            case 'countdown':
+                oscillator.type = 'square';
+                oscillator.frequency.setValueAtTime(400, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                oscillator.stop(now + 0.1);
+                break;
+
+            case 'achievement':
+                oscillator.type = 'triangle';
+                oscillator.frequency.setValueAtTime(600, now);
+                oscillator.frequency.exponentialRampToValueAtTime(1200, now + 0.3);
+                oscillator.frequency.exponentialRampToValueAtTime(800, now + 0.5);
+                gainNode.gain.setValueAtTime(0.3, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+                oscillator.stop(now + 0.5);
+                break;
+
+            case 'save':
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(500, now);
+                oscillator.frequency.exponentialRampToValueAtTime(700, now + 0.1);
+                oscillator.frequency.exponentialRampToValueAtTime(600, now + 0.2);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+                oscillator.stop(now + 0.2);
+                break;
+
+            case 'load':
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(700, now);
+                oscillator.frequency.exponentialRampToValueAtTime(900, now + 0.15);
+                oscillator.frequency.exponentialRampToValueAtTime(800, now + 0.3);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                oscillator.stop(now + 0.3);
+                break;
+
             default:
                 // Default sound for unknown types
                 oscillator.frequency.setValueAtTime(440, now);

@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2D Kampfspiel - Modular Architecture</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #000;
+            color: #fff;
+            font-family: 'Courier New', monospace;
+            overflow: hidden;
+        }
+
+        #gameCanvas {
+            display: block;
+            background: #000;
+        }
+
+        #gameInfo {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 5px;
+            border: 1px solid #4f4;
+        }
+
+        #gameInfo div {
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .health-bar {
+            width: 150px;
+            height: 8px;
+            background: #333;
+            border: 1px solid #666;
+            margin-top: 3px;
+            position: relative;
+        }
+
+        .health-fill {
+            height: 100%;
+            background: #4f4;
+            transition: width 0.3s ease;
+        }
+
+        #performanceInfo {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 5px;
+            border: 1px solid #44f;
+            font-size: 12px;
+            min-width: 200px;
+        }
+
+        #performanceInfo.hidden {
+            display: none;
+        }
+
+        #debugInfo {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 5px;
+            border: 1px solid #f84;
+            font-size: 11px;
+            max-width: 300px;
+        }
+
+        #debugInfo.hidden {
+            display: none;
+        }
+
+        #startScreen {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 40px;
+            border-radius: 10px;
+            border: 2px solid #4f4;
+            z-index: 1000;
+        }
+
+        #startScreen h1 {
+            color: #4f4;
+            margin-bottom: 20px;
+            font-size: 32px;
+        }
+
+        #startScreen p {
+            color: #fff;
+            margin-bottom: 20px;
+            font-size: 16px;
+        }
+
+        .difficulty-buttons {
+            margin-bottom: 30px;
+        }
+
+        .difficulty-button {
+            padding: 10px 20px;
+            margin: 0 10px;
+            font-size: 16px;
+            background-color: #333;
+            color: white;
+            border: 2px solid #666;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .difficulty-button:hover {
+            background-color: #555;
+            border-color: #4f4;
+        }
+
+        .difficulty-button.selected {
+            background-color: #4f4;
+            border-color: #4f4;
+            color: #000;
+        }
+
+        .start-button {
+            padding: 15px 40px;
+            font-size: 24px;
+            background-color: #4a4;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        .start-button:hover {
+            background-color: #5b5;
+        }
+
+        .control-buttons {
+            margin-top: 20px;
+        }
+
+        .control-button {
+            padding: 10px 20px;
+            margin: 0 5px;
+            font-size: 14px;
+            background-color: #44f;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        .control-button:hover {
+            background-color: #55f;
+        }
+
+        #instructions {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 5px;
+            border: 1px solid #666;
+            font-size: 12px;
+            max-width: 300px;
+        }
+
+        #gameOver {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 40px;
+            border-radius: 10px;
+            border: 2px solid #f44;
+            z-index: 1000;
+            display: none;
+        }
+
+        #gameOver h2 {
+            color: #f44;
+            margin-bottom: 20px;
+        }
+
+        #waveMessage {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            font-size: 48px;
+            font-weight: bold;
+            color: #4f4;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+            z-index: 500;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+
+        #waveMessage.show {
+            opacity: 1;
+        }
+
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: #4f4;
+            font-size: 18px;
+        }
+
+        .error {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: #f44;
+            font-size: 18px;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 20px;
+            border-radius: 10px;
+            border: 2px solid #f44;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    
+    <!-- Game UI -->
+    <div id="gameInfo">
+        <div>Punkte: <span id="score">0</span></div>
+        <div>Welle: <span id="wave">1</span></div>
+        <div>Leben: <span id="healthText">100/100</span>
+            <div class="health-bar">
+                <div class="health-fill" id="healthFill" style="width: 100%"></div>
+            </div>
+        </div>
+        <div>Munition: <span id="ammo">30/30</span></div>
+        <div>Waffe: <span id="weapon">Pistole</span></div>
+    </div>
+
+    <!-- Performance Monitor -->
+    <div id="performanceInfo" class="hidden">
+        <div><strong>Performance</strong></div>
+        <div>FPS: <span id="fps">0</span></div>
+        <div>Frame Time: <span id="frameTime">0</span>ms</div>
+        <div>Update Time: <span id="updateTime">0</span>ms</div>
+        <div>Render Time: <span id="renderTime">0</span>ms</div>
+        <div>Entities: <span id="entityCount">0</span></div>
+        <div>Memory: <span id="memoryUsage">0</span>MB</div>
+    </div>
+
+    <!-- Debug Info -->
+    <div id="debugInfo" class="hidden">
+        <div><strong>Debug Info</strong></div>
+        <div>Systems: <span id="systemCount">0</span></div>
+        <div>Events: <span id="eventCount">0</span></div>
+        <div>Services: <span id="serviceCount">0</span></div>
+        <div id="debugMessages"></div>
+    </div>
+
+    <!-- Instructions -->
+    <div id="instructions">
+        <strong>Steuerung:</strong><br>
+        WASD/Pfeiltasten: Bewegen<br>
+        Maus: Zielen und Schießen<br>
+        1-5: Waffenwechsel<br>
+        E: Interagieren<br>
+        F1: Performance anzeigen<br>
+        F2: Debug-Info anzeigen
+    </div>
+
+    <!-- Start Screen -->
+    <div id="startScreen">
+        <h1>2D Kampfspiel</h1>
+        <p>Modular Architecture Demo</p>
+        
+        <div class="difficulty-buttons">
+            <button class="difficulty-button" data-difficulty="easy">Einfach</button>
+            <button class="difficulty-button selected" data-difficulty="normal">Normal</button>
+            <button class="difficulty-button" data-difficulty="hard">Schwer</button>
+        </div>
+        
+        <button class="start-button" onclick="startGame()">SPIEL STARTEN</button>
+        
+        <div class="control-buttons">
+            <button class="control-button" onclick="togglePerformanceInfo()">Performance</button>
+            <button class="control-button" onclick="toggleDebugInfo()">Debug</button>
+            <button class="control-button" onclick="testAudio()">Audio Test</button>
+        </div>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="gameOver">
+        <h2>Spiel vorbei!</h2>
+        <p>Endpunktzahl: <span id="finalScore">0</span></p>
+        <p>Erreichte Welle: <span id="finalLevel">1</span></p>
+        <button class="start-button" onclick="restartGame()">Neues Spiel</button>
+    </div>
+
+    <!-- Wave Message -->
+    <div id="waveMessage"></div>
+
+    <!-- Loading Screen -->
+    <div id="loadingScreen" class="loading">
+        <div>Lade Spiel...</div>
+        <div id="loadingProgress">Initialisiere Module...</div>
+    </div>
+
+    <!-- Error Screen -->
+    <div id="errorScreen" class="error" style="display: none;">
+        <h2>Fehler beim Laden</h2>
+        <p id="errorMessage">Ein unbekannter Fehler ist aufgetreten.</p>
+        <button class="control-button" onclick="location.reload()">Neu laden</button>
+    </div>
+
+    <!-- Load the modular game -->
+    <script type="module">
+        import { Application } from './main.js';
+        
+        // Global variables for compatibility
+        let app = null;
+        let selectedDifficulty = 'normal';
+        let gameStarted = false;
+
+        // Initialize application
+        async function initializeApp() {
+            try {
+                updateLoadingProgress('Initialisiere Anwendung...');
+                
+                // Wait a bit to show loading screen
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                updateLoadingProgress('Lade Konfiguration...');
+                await new Promise(resolve => setTimeout(resolve, 300));
+                
+                updateLoadingProgress('Initialisiere Systeme...');
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                updateLoadingProgress('Starte Engine...');
+                await new Promise(resolve => setTimeout(resolve, 300));
+                
+                // Hide loading screen
+                document.getElementById('loadingScreen').style.display = 'none';
+                
+                // Setup event listeners
+                setupEventListeners();
+                
+                console.log('Application ready');
+                
+            } catch (error) {
+                console.error('Failed to initialize application:', error);
+                showError('Fehler beim Initialisieren der Anwendung: ' + error.message);
+            }
+        }
+
+        function updateLoadingProgress(message) {
+            document.getElementById('loadingProgress').textContent = message;
+        }
+
+        function showError(message) {
+            document.getElementById('loadingScreen').style.display = 'none';
+            document.getElementById('errorMessage').textContent = message;
+            document.getElementById('errorScreen').style.display = 'block';
+        }
+
+        function setupEventListeners() {
+            // Difficulty selection
+            document.querySelectorAll('.difficulty-button').forEach(button => {
+                button.addEventListener('click', () => {
+                    document.querySelectorAll('.difficulty-button').forEach(b => b.classList.remove('selected'));
+                    button.classList.add('selected');
+                    selectedDifficulty = button.dataset.difficulty;
+                });
+            });
+
+            // Keyboard shortcuts
+            document.addEventListener('keydown', (event) => {
+                switch(event.code) {
+                    case 'F1':
+                        event.preventDefault();
+                        togglePerformanceInfo();
+                        break;
+                    case 'F2':
+                        event.preventDefault();
+                        toggleDebugInfo();
+                        break;
+                    case 'Escape':
+                        if (gameStarted) {
+                            // Pause/unpause game
+                            togglePause();
+                        }
+                        break;
+                }
+            });
+
+            // Update performance info periodically
+            setInterval(updatePerformanceInfo, 1000);
+            setInterval(updateDebugInfo, 2000);
+        }
+
+        // Global functions for UI interaction
+        window.startGame = async function() {
+            try {
+                document.getElementById('startScreen').style.display = 'none';
+                gameStarted = true;
+                
+                // Here you would start the actual game with the selected difficulty
+                console.log(`Starting game with difficulty: ${selectedDifficulty}`);
+                
+                // For now, just show a message
+                showWaveMessage('Spiel gestartet!');
+                
+            } catch (error) {
+                console.error('Failed to start game:', error);
+                showError('Fehler beim Starten des Spiels: ' + error.message);
+            }
+        };
+
+        window.restartGame = function() {
+            document.getElementById('gameOver').style.display = 'none';
+            document.getElementById('startScreen').style.display = 'block';
+            gameStarted = false;
+        };
+
+        window.togglePerformanceInfo = function() {
+            const perfInfo = document.getElementById('performanceInfo');
+            perfInfo.classList.toggle('hidden');
+        };
+
+        window.toggleDebugInfo = function() {
+            const debugInfo = document.getElementById('debugInfo');
+            debugInfo.classList.toggle('hidden');
+        };
+
+        window.testAudio = function() {
+            console.log('Testing audio...');
+            // Here you would test the audio system
+            showWaveMessage('Audio Test');
+        };
+
+        window.togglePause = function() {
+            // Toggle game pause
+            console.log('Toggle pause');
+        };
+
+        function showWaveMessage(message) {
+            const waveMsg = document.getElementById('waveMessage');
+            waveMsg.textContent = message;
+            waveMsg.classList.add('show');
+            
+            setTimeout(() => {
+                waveMsg.classList.remove('show');
+            }, 2000);
+        }
+
+        function updatePerformanceInfo() {
+            // Update performance metrics display
+            // This would get real data from the performance monitor
+            document.getElementById('fps').textContent = '60';
+            document.getElementById('frameTime').textContent = '16.7';
+            document.getElementById('updateTime').textContent = '2.1';
+            document.getElementById('renderTime').textContent = '8.3';
+            document.getElementById('entityCount').textContent = '0';
+            document.getElementById('memoryUsage').textContent = '12';
+        }
+
+        function updateDebugInfo() {
+            // Update debug information display
+            document.getElementById('systemCount').textContent = '5';
+            document.getElementById('eventCount').textContent = '0';
+            document.getElementById('serviceCount').textContent = '7';
+        }
+
+        // Start initialization
+        initializeApp();
+    </script>
+</body>
+</html>

@@ -73,9 +73,13 @@ class GameManager {
         this.economyManager = new EconomyManager();
         this.defenseManager = new DefenseManager(this.economyManager);
         this.shopInterface = new ShopInterface(this.defenseManager, this.economyManager);
-        this.economyHUD = new EconomyHUD(this.economyManager);
+        this.economyHUD = new EconomyHUD(this.economyManager, this.bunkerManager);
         this.economyInputHandler = new EconomyInputHandler(this.shopInterface, this.defenseManager, this.economyHUD);
         this.defenseStructures = [];
+
+        // Advanced Bunker System
+        this.bunkerManager = new BunkerManager(this.economyManager);
+        this.bunkerInputHandler = new BunkerInputHandler(this.bunkerManager, this.economyManager);
         
         // Input
         this.keys = {};
@@ -103,6 +107,9 @@ class GameManager {
 
             // Economy system key handling
             this.economyInputHandler.handleKeyPress(e.key);
+
+            // Bunker system key handling
+            this.bunkerInputHandler.handleKeyPress(e.key);
         });
 
         document.addEventListener('keyup', (e) => {
@@ -116,14 +123,20 @@ class GameManager {
 
             // Economy system mouse handling
             this.economyInputHandler.handleMouseMove(e.clientX, e.clientY);
+
+            // Bunker system mouse handling
+            this.bunkerInputHandler.handleMouseMove(e.clientX, e.clientY);
         });
         
         this.canvas.addEventListener('mousedown', (e) => {
             // Economy system click handling first
             if (!this.economyInputHandler.handleMouseClick(e.clientX, e.clientY, e.button)) {
-                // If not handled by economy system, handle as normal game input
-                if (this.player) {
-                    this.player.isFiring = true;
+                // Bunker system click handling second
+                if (!this.bunkerInputHandler.handleMouseClick(e.clientX, e.clientY, e.button)) {
+                    // If not handled by either system, handle as normal game input
+                    if (this.player) {
+                        this.player.isFiring = true;
+                    }
                 }
             }
             // Initialize audio on first interaction
@@ -581,6 +594,9 @@ class GameManager {
         this.economyManager.update();
         this.defenseManager.update([...this.enemies, ...this.enemySquads.flatMap(squad => squad.members)]);
         this.defenseStructures = this.defenseManager.structures;
+
+        // Update bunker system
+        this.bunkerManager.update();
 
         // Update particles
         updateParticles();
@@ -1071,6 +1087,9 @@ class GameManager {
 
         // Draw defense structures
         this.defenseManager.render(this.ctx);
+
+        // Draw bunker system
+        this.bunkerManager.render(this.ctx);
 
         // Draw particles
         particles.forEach(particle => this.renderer.drawParticle(particle));

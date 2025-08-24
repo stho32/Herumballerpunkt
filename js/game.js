@@ -948,25 +948,41 @@ class GameManager {
             // Check enemy/ally collision with weapon upgrades
             if (pickup.type === 'upgrade') {
                 let collected = false;
-                
+
                 [...this.enemies, ...this.allies].forEach(unit => {
                     if (!collected && checkCollision(pickup, unit)) {
                         if (unit.upgradeCount !== undefined) {
-                            unit.weaponSystem.addUpgrade(pickup.upgrade);
+                            // Only apply weapon upgrades if unit has a weapon system
+                            if (unit.weaponSystem && unit.weaponSystem.addUpgrade) {
+                                unit.weaponSystem.addUpgrade(pickup.upgrade);
+                            } else {
+                                // For units without weapon systems, apply basic stat upgrades
+                                if (pickup.upgrade.damageBonus) {
+                                    unit.damage = (unit.damage || 10) + pickup.upgrade.damageBonus;
+                                }
+                                if (pickup.upgrade.healthBonus) {
+                                    unit.maxHealth += pickup.upgrade.healthBonus;
+                                    unit.health = Math.min(unit.maxHealth, unit.health + pickup.upgrade.healthBonus);
+                                }
+                                if (pickup.upgrade.speedBonus) {
+                                    unit.speed += pickup.upgrade.speedBonus;
+                                }
+                            }
+
                             unit.upgradeCount++;
                             unit.radius = unit.radius + 2;
                             unit.speed *= 0.9;
                         }
                         createParticles(pickup.x, pickup.y, '#f44');
                         collected = true;
-                        
+
                         // Apply global upgrades to all allies
                         if (pickup.upgrade.isGlobal && unit.isAlly) {
                             this.applyGlobalUpgrade(pickup.upgrade);
                         }
                     }
                 });
-                
+
                 if (collected) return false;
             }
             

@@ -135,6 +135,44 @@ function createWeaponPickup(x, y, weaponIndex = null) {
 }
 
 function createUpgradePickup(x, y) {
+    // Create different types of upgrades
+    const upgradeTypes = [
+        {
+            name: 'MG Upgrade',
+            type: 'mg',
+            description: 'Upgrade to Machine Gun',
+            damageBonus: 5,
+            healthBonus: 0,
+            speedBonus: 0
+        },
+        {
+            name: 'Damage Boost',
+            type: 'damage',
+            description: 'Increases damage',
+            damageBonus: 10,
+            healthBonus: 0,
+            speedBonus: 0
+        },
+        {
+            name: 'Health Boost',
+            type: 'health',
+            description: 'Increases health',
+            damageBonus: 0,
+            healthBonus: 25,
+            speedBonus: 0
+        },
+        {
+            name: 'Speed Boost',
+            type: 'speed',
+            description: 'Increases movement speed',
+            damageBonus: 0,
+            healthBonus: 0,
+            speedBonus: 0.5
+        }
+    ];
+
+    const randomUpgrade = upgradeTypes[Math.floor(Math.random() * upgradeTypes.length)];
+
     return {
         x: x,
         y: y,
@@ -142,7 +180,7 @@ function createUpgradePickup(x, y) {
         radius: 12,
         lifetime: 10000,
         created: Date.now(),
-        upgrade: { name: 'MG Upgrade', type: 'mg', description: 'Upgrade to Machine Gun' },
+        upgrade: randomUpgrade,
         rotation: 0
     };
 }

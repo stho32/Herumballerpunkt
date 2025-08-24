@@ -61,6 +61,10 @@ class GameManager {
         this.powerUpManager = new PowerUpManager();
         this.spawnedPowerUps = [];
         this.activePowerUps = new Map();
+
+        // Environmental Hazards System
+        this.hazardManager = new HazardManager();
+        this.gameStartTime = Date.now();
         
         // Input
         this.keys = {};
@@ -142,6 +146,7 @@ class GameManager {
         this.pickups = [];
         this.spawnedPowerUps = [];
         this.activePowerUps.clear();
+        this.hazardManager.clearAllHazards();
         particles = [];
         
         // Hide game over
@@ -253,7 +258,10 @@ class GameManager {
         if (this.waveActive && enemiesLeft === 0) {
             this.waveActive = false;
             this.wave++;
-            
+
+            // Notify hazard manager of wave completion
+            this.hazardManager.onWaveComplete();
+
             // Give bonus points
             this.score += 100 * this.wave;
             this.updateDisplay();
@@ -520,6 +528,9 @@ class GameManager {
 
         // Update power-ups
         this.powerUpManager.update(this);
+
+        // Update environmental hazards
+        this.hazardManager.update(this);
 
         // Update particles
         updateParticles();
@@ -973,6 +984,9 @@ class GameManager {
 
         // Draw power-ups
         this.powerUpManager.render(this.ctx);
+
+        // Draw environmental hazards
+        this.hazardManager.render(this.ctx);
 
         // Draw particles
         particles.forEach(particle => this.renderer.drawParticle(particle));

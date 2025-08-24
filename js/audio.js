@@ -177,6 +177,53 @@ function playSound(type, volume = 0.3) {
                 gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
                 oscillator.stop(now + 0.2);
                 break;
+
+            case 'hazard_warning':
+                oscillator.type = 'sawtooth';
+                oscillator.frequency.setValueAtTime(200, now);
+                oscillator.frequency.exponentialRampToValueAtTime(400, now + 0.1);
+                oscillator.frequency.exponentialRampToValueAtTime(200, now + 0.2);
+                oscillator.frequency.exponentialRampToValueAtTime(400, now + 0.3);
+                gainNode.gain.setValueAtTime(0.3, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                oscillator.stop(now + 0.3);
+                break;
+
+            case 'hazard_activate':
+                oscillator.type = 'square';
+                oscillator.frequency.setValueAtTime(150, now);
+                oscillator.frequency.exponentialRampToValueAtTime(300, now + 0.5);
+                gainNode.gain.setValueAtTime(0.4, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+                oscillator.stop(now + 0.5);
+                break;
+
+            case 'laser_hit':
+                oscillator.type = 'sawtooth';
+                oscillator.frequency.setValueAtTime(1000, now);
+                oscillator.frequency.exponentialRampToValueAtTime(2000, now + 0.1);
+                gainNode.gain.setValueAtTime(0.5, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                oscillator.stop(now + 0.1);
+                break;
+
+            case 'meteor_warning':
+                oscillator.type = 'triangle';
+                oscillator.frequency.setValueAtTime(800, now);
+                oscillator.frequency.exponentialRampToValueAtTime(400, now + 0.2);
+                gainNode.gain.setValueAtTime(0.2, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+                oscillator.stop(now + 0.2);
+                break;
+
+            case 'lightning':
+                oscillator.type = 'square';
+                oscillator.frequency.setValueAtTime(2000, now);
+                oscillator.frequency.exponentialRampToValueAtTime(100, now + 0.15);
+                gainNode.gain.setValueAtTime(0.4, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+                oscillator.stop(now + 0.15);
+                break;
                 
             default:
                 // Default sound for unknown types

@@ -745,6 +745,7 @@ class GameManager {
                     this.poolManager.bulletPool.releaseBullet(bullet);
                     return false;
                 }
+            }
         } else if (bullet.isAlly) {
             // Allied bullets hit enemies
             for (const target of potentialTargets) {
@@ -794,6 +795,7 @@ class GameManager {
                     this.poolManager.bulletPool.releaseBullet(bullet);
                     return false;
                 }
+            }
         } else {
             // Enemy bullets hit player and allies
             if (this.spatialManager.checkCollision(bullet, this.player)) {
@@ -1203,3 +1205,8 @@ class GameManager {
 
 // Create global game manager
 const gameManager = new GameManager();
+
+// Make it available globally
+if (typeof window !== 'undefined') {
+    window.gameManager = gameManager;
+}

@@ -6,8 +6,8 @@ let particlePool = null; // Will be set by game manager
 
 function createParticles(x, y, color, count = 10) {
     // Use optimized particle creation if pool is available
-    if (particlePool && typeof gameManager !== 'undefined' && gameManager.poolManager) {
-        const newParticles = gameManager.poolManager.particlePool.createParticle(x, y, color, count);
+    if (typeof window !== 'undefined' && window.gameManager && window.gameManager.poolManager) {
+        const newParticles = window.gameManager.poolManager.particlePool.createParticle(x, y, color, count);
         particles.push(...newParticles);
         return;
     }
@@ -39,8 +39,8 @@ function updateParticles() {
         if (particle.life !== undefined) {
             particle.life++;
             if (particle.life >= particle.maxLife) {
-                if (particlePool && typeof gameManager !== 'undefined' && gameManager.poolManager) {
-                    gameManager.poolManager.particlePool.releaseParticle(particle);
+                if (typeof window !== 'undefined' && window.gameManager && window.gameManager.poolManager) {
+                    window.gameManager.poolManager.particlePool.releaseParticle(particle);
                 }
                 return false;
             }

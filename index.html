@@ -79,30 +79,46 @@
     </div>
     
     <script>
+        // Global game manager reference
+        let gameManagerInstance = null;
+
         // Initialize game manager
         window.addEventListener('load', () => {
-            gameManager.init();
+            if (typeof gameManager !== 'undefined') {
+                gameManagerInstance = gameManager;
+                gameManager.init();
+            }
         });
-        
+
         function startGameWithAudio() {
+            if (!gameManagerInstance) {
+                console.error('Game manager not initialized yet');
+                return;
+            }
+
             // Hide start screen
             document.getElementById('startScreen').style.display = 'none';
-            
+
             // Initialize audio context
             initAudio();
-            
+
             // Start game
-            gameManager.startGame();
-            
+            gameManagerInstance.startGame();
+
             // Test sound after a short delay
             setTimeout(() => {
                 console.log('Testing audio...');
                 playSound('pickup', 0.1);
             }, 500);
         }
-        
+
         function setDifficulty(level) {
-            gameManager.difficulty = level;
+            if (!gameManagerInstance) {
+                console.error('Game manager not initialized yet');
+                return;
+            }
+
+            gameManagerInstance.difficulty = level;
             // Visual feedback
             document.querySelectorAll('#startScreen button').forEach(btn => {
                 if (btn.textContent === 'Einfach' && level === 'easy') btn.style.backgroundColor = '#6c6';
@@ -113,11 +129,16 @@
                 else if (btn.textContent === 'Schwer') btn.style.backgroundColor = '#a44';
             });
         }
-        
+
         function restartGame() {
+            if (!gameManagerInstance) {
+                console.error('Game manager not initialized yet');
+                return;
+            }
+
             // Initialize audio if needed
             initAudio();
-            gameManager.startGame();
+            gameManagerInstance.startGame();
         }
         
         function testSound() {

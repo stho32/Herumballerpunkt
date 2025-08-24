@@ -239,20 +239,44 @@ class Renderer {
     }
     
     drawEnemy(enemy) {
-        this.ctx.fillStyle = '#d44';
-        this.ctx.strokeStyle = '#922';
-        this.ctx.lineWidth = 2 + enemy.upgradeCount;
-        
+        // Elite rendering
+        if (enemy.isElite) {
+            enemy.render(this.ctx);
+        }
+
+        // Body color based on type
+        let bodyColor = '#d44';
+        let strokeColor = '#922';
+
+        if (enemy.isElite) {
+            bodyColor = enemy.config.glowColor;
+            strokeColor = enemy.config.particleColor;
+        }
+
+        this.ctx.fillStyle = bodyColor;
+        this.ctx.strokeStyle = strokeColor;
+        this.ctx.lineWidth = (enemy.isElite ? 3 : 2) + (enemy.upgradeCount || 0);
+
         this.ctx.beginPath();
         this.ctx.arc(enemy.x, enemy.y, enemy.radius, 0, Math.PI * 2);
         this.ctx.fill();
         this.ctx.stroke();
-        
+
         // Health bar
         if (enemy.health < enemy.maxHealth) {
-            this.drawHealthBar(enemy.x, enemy.y - 20, 30, 4, enemy.health / enemy.maxHealth);
+            const barWidth = enemy.isElite ? 40 : 30;
+            const barHeight = enemy.isElite ? 6 : 4;
+            this.drawHealthBar(enemy.x, enemy.y - 20, barWidth, barHeight, enemy.health / enemy.maxHealth);
         }
-        
+
+        // Elite name tag
+        if (enemy.isElite) {
+            this.ctx.fillStyle = enemy.config.glowColor;
+            this.ctx.font = 'bold 10px Arial';
+            this.ctx.textAlign = 'center';
+            this.ctx.fillText(enemy.config.name, enemy.x, enemy.y - enemy.radius - 30);
+        }
+
         // Upgrade indicators
         if (enemy.upgradeCount > 0) {
             this.ctx.fillStyle = '#ff0';

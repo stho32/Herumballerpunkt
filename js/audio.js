@@ -224,6 +224,55 @@ function playSound(type, volume = 0.3) {
                 gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
                 oscillator.stop(now + 0.15);
                 break;
+
+            case 'elite_spawn':
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(220, now);
+                oscillator.frequency.exponentialRampToValueAtTime(440, now + 0.2);
+                oscillator.frequency.exponentialRampToValueAtTime(880, now + 0.4);
+                oscillator.frequency.exponentialRampToValueAtTime(1760, now + 0.6);
+                gainNode.gain.setValueAtTime(0.3, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.6);
+                oscillator.stop(now + 0.6);
+                break;
+
+            case 'elite_death':
+                oscillator.type = 'sawtooth';
+                oscillator.frequency.setValueAtTime(880, now);
+                oscillator.frequency.exponentialRampToValueAtTime(220, now + 0.8);
+                gainNode.gain.setValueAtTime(0.4, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.8);
+                oscillator.stop(now + 0.8);
+                break;
+
+            case 'berserker_rage':
+                oscillator.type = 'square';
+                oscillator.frequency.setValueAtTime(150, now);
+                oscillator.frequency.exponentialRampToValueAtTime(300, now + 0.3);
+                oscillator.frequency.exponentialRampToValueAtTime(150, now + 0.6);
+                gainNode.gain.setValueAtTime(0.4, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.6);
+                oscillator.stop(now + 0.6);
+                break;
+
+            case 'sniper_shot':
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(1200, now);
+                oscillator.frequency.exponentialRampToValueAtTime(800, now + 0.2);
+                gainNode.gain.setValueAtTime(0.3, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+                oscillator.stop(now + 0.2);
+                break;
+
+            case 'teleport':
+                oscillator.type = 'triangle';
+                oscillator.frequency.setValueAtTime(660, now);
+                oscillator.frequency.exponentialRampToValueAtTime(1320, now + 0.1);
+                oscillator.frequency.exponentialRampToValueAtTime(330, now + 0.3);
+                gainNode.gain.setValueAtTime(0.3, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                oscillator.stop(now + 0.3);
+                break;
                 
             default:
                 // Default sound for unknown types

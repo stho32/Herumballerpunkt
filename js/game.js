@@ -65,6 +65,9 @@ class GameManager {
         // Environmental Hazards System
         this.hazardManager = new HazardManager();
         this.gameStartTime = Date.now();
+
+        // Elite Enemy System
+        this.eliteManager = new EliteManager();
         
         // Input
         this.keys = {};
@@ -216,12 +219,25 @@ class GameManager {
             const squadCount = Math.floor(enemyCount / 4);
             const individualCount = enemyCount - squadCount * 3;
             
-            // Spawn individual enemies
+            // Spawn individual enemies (mix of regular and elite)
             for (let i = 0; i < individualCount; i++) {
                 setTimeout(() => {
                     const pos = getRandomEdgePosition(this.canvas);
-                    const enemy = new Enemy(pos.x, pos.y, enemyLevel);
-                    this.enemies.push(enemy);
+
+                    // Check if this should be an elite
+                    if (this.eliteManager.shouldSpawnElite(this.wave, individualCount)) {
+                        const eliteType = this.eliteManager.selectEliteType(this.wave);
+                        const elite = this.eliteManager.createElite(pos.x, pos.y, eliteType, enemyLevel);
+                        this.enemies.push(elite);
+                        this.eliteManager.onEliteSpawned();
+
+                        // Elite spawn effect
+                        createParticles(pos.x, pos.y, elite.config.particleColor, 25);
+                        playSound('elite_spawn', 0.5);
+                    } else {
+                        const enemy = new Enemy(pos.x, pos.y, enemyLevel);
+                        this.enemies.push(enemy);
+                    }
                 }, i * spawnDelay);
             }
             
@@ -259,8 +275,9 @@ class GameManager {
             this.waveActive = false;
             this.wave++;
 
-            // Notify hazard manager of wave completion
+            // Notify managers of wave completion
             this.hazardManager.onWaveComplete();
+            this.eliteManager.onWaveComplete();
 
             // Give bonus points
             this.score += 100 * this.wave;
@@ -618,6 +635,17 @@ class GameManager {
                             // Check for explosion aura power-up
                             if (this.activePowerUps.has('EXPLOSION_AURA')) {
                                 this.createExplosionAura(enemy.x, enemy.y);
+                            }
+
+                            // Elite rewards
+                            if (enemy.isElite) {
+                                this.score += enemy.config.scoreValue;
+                                // 50% chance for power-up, 25% for rare weapon upgrade
+                                if (Math.random() < 0.5) {
+                                    this.spawnPickup(enemy.x, enemy.y, false, true, false);
+                                } else if (Math.random() < 0.25) {
+                                    this.pickups.push(createWeaponPickup(enemy.x, enemy.y, true)); // Rare upgrade
+                                }
                             }
 
                             // Superboss rewards

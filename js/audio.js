@@ -131,6 +131,52 @@ function playSound(type, volume = 0.3) {
                 gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
                 oscillator.stop(now + 0.5);
                 break;
+
+            case 'powerup':
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(440, now);
+                oscillator.frequency.exponentialRampToValueAtTime(880, now + 0.3);
+                oscillator.frequency.exponentialRampToValueAtTime(1320, now + 0.6);
+                gainNode.gain.setValueAtTime(0.3, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.6);
+                oscillator.stop(now + 0.6);
+                break;
+
+            case 'powerup_end':
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(880, now);
+                oscillator.frequency.exponentialRampToValueAtTime(440, now + 0.3);
+                gainNode.gain.setValueAtTime(0.2, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                oscillator.stop(now + 0.3);
+                break;
+
+            case 'shield_hit':
+                oscillator.type = 'square';
+                oscillator.frequency.setValueAtTime(660, now);
+                oscillator.frequency.exponentialRampToValueAtTime(440, now + 0.1);
+                gainNode.gain.setValueAtTime(0.2, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                oscillator.stop(now + 0.1);
+                break;
+
+            case 'shield_break':
+                oscillator.type = 'sawtooth';
+                oscillator.frequency.setValueAtTime(880, now);
+                oscillator.frequency.exponentialRampToValueAtTime(220, now + 0.4);
+                gainNode.gain.setValueAtTime(0.3, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+                oscillator.stop(now + 0.4);
+                break;
+
+            case 'spawn':
+                oscillator.type = 'triangle';
+                oscillator.frequency.setValueAtTime(330, now);
+                oscillator.frequency.exponentialRampToValueAtTime(660, now + 0.2);
+                gainNode.gain.setValueAtTime(0.2, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+                oscillator.stop(now + 0.2);
+                break;
                 
             default:
                 // Default sound for unknown types

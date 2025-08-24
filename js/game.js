@@ -56,6 +56,11 @@ class GameManager {
         this.enemySquads = [];
         this.lastBossWave = 0;
         this.enhanceEnemyLevel = 0;
+
+        // Power-Up System
+        this.powerUpManager = new PowerUpManager();
+        this.spawnedPowerUps = [];
+        this.activePowerUps = new Map();
         
         // Input
         this.keys = {};
@@ -135,6 +140,8 @@ class GameManager {
         this.walls = [];
         this.bullets = [];
         this.pickups = [];
+        this.spawnedPowerUps = [];
+        this.activePowerUps.clear();
         particles = [];
         
         // Hide game over
@@ -330,10 +337,19 @@ class GameManager {
         this.turrets.push(new Turret(x, y, type, isAlly));
     }
     
-    spawnPickup(x, y, fromAlly = false) {
+    spawnPickup(x, y, fromAlly = false, isElite = false, isBoss = false) {
         const rand = Math.random();
         const diffMult = this.difficultyMultipliers[this.difficulty];
-        
+
+        // Check for power-up spawn first
+        let eventType = 'enemy_kill';
+        if (isBoss) eventType = 'boss_kill';
+        else if (isElite) eventType = 'elite_kill';
+
+        if (this.powerUpManager.shouldSpawnPowerUp(eventType, this)) {
+            this.powerUpManager.spawnPowerUp(x, y);
+        }
+
         // Higher chance of upgrades when allies kill enemies
         if (fromAlly) {
             if (rand < 0.7) {
@@ -501,7 +517,10 @@ class GameManager {
         
         // Update pickups
         this.updatePickups();
-        
+
+        // Update power-ups
+        this.powerUpManager.update(this);
+
         // Update particles
         updateParticles();
         
@@ -585,6 +604,11 @@ class GameManager {
                         playSound('hit', 0.1);
                         
                         if (enemy.health <= 0) {
+                            // Check for explosion aura power-up
+                            if (this.activePowerUps.has('EXPLOSION_AURA')) {
+                                this.createExplosionAura(enemy.x, enemy.y);
+                            }
+
                             // Superboss rewards
                             if (enemy instanceof Superboss) {
                                 this.lastBossWave = this.wave; // Track boss defeat for reorganization
@@ -642,6 +666,11 @@ class GameManager {
                             playSound('hit', 0.1);
                             
                             if (member.health <= 0) {
+                                // Check for explosion aura power-up
+                                if (this.activePowerUps.has('EXPLOSION_AURA')) {
+                                    this.createExplosionAura(member.x, member.y);
+                                }
+
                                 this.score += 15; // Squad members worth more points
                                 if (Math.random() < 0.4) { // Higher drop chance
                                     this.spawnPickup(member.x, member.y);
@@ -941,7 +970,10 @@ class GameManager {
         
         // Draw pickups
         this.pickups.forEach(pickup => this.renderer.drawPickup(pickup));
-        
+
+        // Draw power-ups
+        this.powerUpManager.render(this.ctx);
+
         // Draw particles
         particles.forEach(particle => this.renderer.drawParticle(particle));
         
@@ -1042,6 +1074,36 @@ class GameManager {
         msg.textContent = `${upgrade.name} aktiviert!`;
         msg.style.display = 'block';
         setTimeout(() => { msg.style.display = 'none'; }, 2000);
+    }
+
+    createExplosionAura(x, y) {
+        const config = POWER_UP_CONFIGS.EXPLOSION_AURA;
+        const explosionRadius = config.effects.explosionRadius;
+        const explosionDamage = config.effects.explosionDamage;
+
+        // Create visual explosion effect
+        createParticles(x, y, '#ff8844', 20);
+        createParticles(x, y, '#ffaa00', 15);
+        playSound('explosion', 0.3);
+
+        // Apply damage to nearby enemies
+        [...this.enemies, ...this.enemySquads.flatMap(squad => squad.members)].forEach(enemy => {
+            const distance = getDistance(x, y, enemy.x, enemy.y);
+            if (distance <= explosionRadius && enemy.health > 0) {
+                const damageMultiplier = 1 - (distance / explosionRadius);
+                const finalDamage = explosionDamage * damageMultiplier;
+                enemy.takeDamage(finalDamage);
+
+                // Create chain reaction if enemy dies
+                if (enemy.health <= 0) {
+                    setTimeout(() => {
+                        if (this.activePowerUps.has('EXPLOSION_AURA')) {
+                            this.createExplosionAura(enemy.x, enemy.y);
+                        }
+                    }, 100);
+                }
+            }
+        });
     }
 }
 

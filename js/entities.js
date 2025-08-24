@@ -18,6 +18,14 @@ class Player {
         this.reloadStartTime = 0;
         this.reloadDuration = 2000;
         this.upgradeCount = 0;
+
+        // Power-Up properties
+        this.berserkerMode = false;
+        this.hasShield = false;
+        this.shieldHits = 0;
+        this.ghostMode = false;
+        this.magnetMode = false;
+        this.magnetRadius = 0;
     }
     
     update(keys, mouse, walls) {
@@ -31,13 +39,15 @@ class Player {
         // Apply movement
         this.x += dx;
         this.y += dy;
-        
-        // Wall collision
-        walls.forEach(wall => {
-            if (checkWallCollision(this, wall)) {
-                resolveWallCollision(this, wall);
-            }
-        });
+
+        // Wall collision (skip if in ghost mode)
+        if (!this.ghostMode) {
+            walls.forEach(wall => {
+                if (checkWallCollision(this, wall)) {
+                    resolveWallCollision(this, wall);
+                }
+            });
+        }
         
         // Keep in bounds
         this.x = clamp(this.x, this.radius, canvas.width - this.radius);
@@ -119,25 +129,39 @@ class Player {
             console.error('Invalid damage amount:', amount);
             return;
         }
-        
+
+        // Check shield power-up first
+        if (this.hasShield && this.shieldHits > 0) {
+            this.shieldHits--;
+            createParticles(this.x, this.y, '#4444ff', 15);
+            playSound('shield_hit', 0.4);
+
+            if (this.shieldHits <= 0) {
+                this.hasShield = false;
+                createParticles(this.x, this.y, '#ff4444', 20);
+                playSound('shield_break', 0.5);
+            }
+            return; // No damage taken
+        }
+
         // Apply damage reduction if present
         if (this.damageReduction !== undefined && !isNaN(this.damageReduction)) {
             amount *= (1 - this.damageReduction);
         }
-        
+
         // Validate health before and after
         if (isNaN(this.health)) {
             console.error('Player health is NaN, resetting to 100');
             this.health = 100;
         }
-        
+
         this.health -= amount;
-        
+
         if (isNaN(this.health)) {
             console.error('Player health became NaN after taking damage:', amount);
             this.health = 100;
         }
-        
+
         createParticles(this.x, this.y, '#f44');
         playSound('hit');
     }

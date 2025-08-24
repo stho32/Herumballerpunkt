@@ -34,11 +34,54 @@ class Renderer {
         this.ctx.save();
         this.ctx.translate(player.x, player.y);
         this.ctx.rotate(player.angle);
-        
-        // Body
-        this.ctx.fillStyle = '#44f';
+
+        // Power-up visual effects
+        if (player.berserkerMode) {
+            // Red pulsing aura for berserker mode
+            const pulse = 1 + Math.sin(Date.now() * 0.01) * 0.3;
+            const gradient = this.ctx.createRadialGradient(0, 0, 0, 0, 0, player.radius * pulse * 2);
+            gradient.addColorStop(0, '#ff444480');
+            gradient.addColorStop(0.5, '#ff444440');
+            gradient.addColorStop(1, '#ff444400');
+            this.ctx.fillStyle = gradient;
+            this.ctx.fillRect(-player.radius * pulse * 2, -player.radius * pulse * 2,
+                            player.radius * pulse * 4, player.radius * pulse * 4);
+        }
+
+        if (player.hasShield) {
+            // Blue shield aura
+            this.ctx.strokeStyle = '#4444ff';
+            this.ctx.lineWidth = 4;
+            this.ctx.setLineDash([5, 5]);
+            this.ctx.beginPath();
+            this.ctx.arc(0, 0, player.radius + 8, 0, Math.PI * 2);
+            this.ctx.stroke();
+            this.ctx.setLineDash([]);
+        }
+
+        if (player.magnetMode) {
+            // Golden magnetic field
+            const magnetPulse = 1 + Math.sin(Date.now() * 0.008) * 0.2;
+            this.ctx.strokeStyle = '#ffff4480';
+            this.ctx.lineWidth = 2;
+            this.ctx.beginPath();
+            this.ctx.arc(0, 0, player.magnetRadius * magnetPulse * 0.3, 0, Math.PI * 2);
+            this.ctx.stroke();
+        }
+
+        // Body color changes based on power-ups
+        let bodyColor = '#44f';
+        if (player.berserkerMode) bodyColor = '#f44';
+        else if (player.ghostMode) bodyColor = '#f4f';
+
+        this.ctx.fillStyle = bodyColor;
         this.ctx.strokeStyle = '#226';
         this.ctx.lineWidth = 2 + player.upgradeCount;
+
+        // Ghost mode transparency
+        if (player.ghostMode) {
+            this.ctx.globalAlpha = 0.5;
+        }
         
         this.ctx.beginPath();
         this.ctx.arc(0, 0, player.radius, 0, Math.PI * 2);
@@ -56,6 +99,9 @@ class Renderer {
         }
         
         this.ctx.restore();
+
+        // Power-up status indicators
+        this.drawPowerUpStatus(player);
         
         // Reload indicator
         if (player.isReloading) {
@@ -754,6 +800,43 @@ class Renderer {
         }
         
         this.ctx.restore();
+    }
+
+    drawPowerUpStatus(player) {
+        // Draw active power-up indicators above player
+        let yOffset = -player.radius - 30;
+
+        if (player.berserkerMode) {
+            this.ctx.fillStyle = '#ff4444';
+            this.ctx.font = 'bold 12px Arial';
+            this.ctx.textAlign = 'center';
+            this.ctx.fillText('⚔ BERSERKER', player.x, player.y + yOffset);
+            yOffset -= 15;
+        }
+
+        if (player.hasShield) {
+            this.ctx.fillStyle = '#4444ff';
+            this.ctx.font = 'bold 12px Arial';
+            this.ctx.textAlign = 'center';
+            this.ctx.fillText(`🛡 SHIELD (${player.shieldHits})`, player.x, player.y + yOffset);
+            yOffset -= 15;
+        }
+
+        if (player.ghostMode) {
+            this.ctx.fillStyle = '#ff44ff';
+            this.ctx.font = 'bold 12px Arial';
+            this.ctx.textAlign = 'center';
+            this.ctx.fillText('👻 GHOST', player.x, player.y + yOffset);
+            yOffset -= 15;
+        }
+
+        if (player.magnetMode) {
+            this.ctx.fillStyle = '#ffff44';
+            this.ctx.font = 'bold 12px Arial';
+            this.ctx.textAlign = 'center';
+            this.ctx.fillText('🧲 MAGNET', player.x, player.y + yOffset);
+            yOffset -= 15;
+        }
     }
     
     drawUI(score, wave, ammo, maxAmmo, weaponName, health, maxHealth, bunker = null) {

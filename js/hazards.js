@@ -5,14 +5,15 @@
 const HAZARD_CONFIGS = {
     LASER_GRID: {
         name: 'Laser-Grid',
-        warningTime: 3000,
-        activeTime: 8000,
-        cooldown: 15000,
+        warningTime: 5000,  // Increased from 3000ms to 5000ms (5 seconds)
+        activeTime: 4000,   // Reduced from 8000ms to 4000ms (4 seconds)
+        cooldown: 20000,    // Increased cooldown from 15000ms to 20000ms
         color: '#ff0000',
         warningColor: '#ff4444',
-        spawnWeight: 20,
+        spawnWeight: 12,    // Reduced from 20 to 12 (40% less likely to spawn)
         effects: {
-            instantKill: true,
+            instantKill: false,     // Changed from true to false
+            damagePercent: 0.65,    // 65% of max health instead of instant kill
             affectsAll: true
         }
     },
@@ -217,43 +218,70 @@ class LaserGrid extends EnvironmentalHazard {
         super('LASER_GRID', x, y);
         this.laserLines = this.generateLaserPattern();
         this.radius = 0; // Covers entire screen
+        this.damageDealt = new Set(); // Track entities that already took damage
+    }
+
+    showWarning() {
+        // Enhanced warning for laser grid
+        super.showWarning();
+
+        // Additional warning message
+        console.log('⚠️ LASER GRID INCOMING! Find safe zones between the laser lines!');
+
+        // Create warning particles at laser positions
+        this.laserLines.forEach(line => {
+            const midX = (line.x1 + line.x2) / 2;
+            const midY = (line.y1 + line.y2) / 2;
+            createParticles(midX, midY, this.config.warningColor, 5);
+        });
     }
     
     generateLaserPattern() {
         const lines = [];
-        const spacing = 80;
+        const spacing = 120; // Increased from 80 to 120 for more escape routes
         const offset = Math.random() * spacing;
         const isVertical = Math.random() < 0.5;
-        
+        const skipChance = 0.3; // 30% chance to skip a laser line for gaps
+
         if (isVertical) {
-            // Vertical lines
+            // Vertical lines with gaps
             for (let x = offset; x < canvas.width; x += spacing) {
-                lines.push({
-                    x1: x, y1: 0,
-                    x2: x, y2: canvas.height,
-                    type: 'vertical'
-                });
+                if (Math.random() > skipChance) { // Skip some lines for escape routes
+                    lines.push({
+                        x1: x, y1: 0,
+                        x2: x, y2: canvas.height,
+                        type: 'vertical'
+                    });
+                }
             }
         } else {
-            // Horizontal lines
+            // Horizontal lines with gaps
             for (let y = offset; y < canvas.height; y += spacing) {
-                lines.push({
-                    x1: 0, y1: y,
-                    x2: canvas.width, y2: y,
-                    type: 'horizontal'
-                });
+                if (Math.random() > skipChance) { // Skip some lines for escape routes
+                    lines.push({
+                        x1: 0, y1: y,
+                        x2: canvas.width, y2: y,
+                        type: 'horizontal'
+                    });
+                }
             }
         }
-        
+
         return lines;
     }
     
     updateActiveEffects(entities) {
         if (this.state !== 'active') return;
-        
+
+        // Reset damage tracking each update cycle
+        if (!this.damageDealt) {
+            this.damageDealt = new Set();
+        }
+
         entities.forEach(entity => {
-            if (this.checkLaserCollision(entity)) {
+            if (this.checkLaserCollision(entity) && !this.damageDealt.has(entity)) {
                 this.applyEffect(entity);
+                this.damageDealt.add(entity); // Prevent multiple damage per cycle
             }
         });
     }
@@ -279,29 +307,53 @@ class LaserGrid extends EnvironmentalHazard {
     }
     
     applyEffect(entity) {
-        // Instant kill for laser grid
-        entity.takeDamage(9999);
-        createParticles(entity.x, entity.y, '#ff0000', 20);
-        playSound('laser_hit', 0.6);
+        // Apply percentage-based damage instead of instant kill
+        const damageAmount = Math.floor(entity.maxHealth * this.config.effects.damagePercent);
+        entity.takeDamage(damageAmount);
+
+        // Enhanced visual feedback for significant damage
+        createParticles(entity.x, entity.y, '#ff0000', 15);
+        createParticles(entity.x, entity.y, '#ffaa00', 10); // Additional orange particles
+        playSound('laser_hit', 0.5);
+
+        console.log(`Laser Grid hit ${entity.constructor.name} for ${damageAmount} damage (${Math.round(this.config.effects.damagePercent * 100)}% of max health)`);
     }
     
     renderSpecific(ctx) {
-        if (this.state === 'active') {
-            ctx.save();
-            ctx.strokeStyle = this.config.color;
-            ctx.lineWidth = 4;
-            ctx.shadowColor = this.config.color;
-            ctx.shadowBlur = 10;
-            
+        ctx.save();
+
+        if (this.state === 'warning') {
+            // Show warning laser positions with pulsing effect
+            const pulseAlpha = 0.3 + Math.sin(this.pulseTimer) * 0.2;
+            ctx.strokeStyle = this.config.warningColor;
+            ctx.lineWidth = 2;
+            ctx.globalAlpha = pulseAlpha;
+            ctx.setLineDash([10, 10]); // Dashed lines for warning
+
             this.laserLines.forEach(line => {
                 ctx.beginPath();
                 ctx.moveTo(line.x1, line.y1);
                 ctx.lineTo(line.x2, line.y2);
                 ctx.stroke();
             });
-            
-            ctx.restore();
+
+            ctx.setLineDash([]); // Reset dash
+        } else if (this.state === 'active') {
+            // Active laser beams
+            ctx.strokeStyle = this.config.color;
+            ctx.lineWidth = 6; // Increased from 4 for better visibility
+            ctx.shadowColor = this.config.color;
+            ctx.shadowBlur = 15; // Increased glow effect
+
+            this.laserLines.forEach(line => {
+                ctx.beginPath();
+                ctx.moveTo(line.x1, line.y1);
+                ctx.lineTo(line.x2, line.y2);
+                ctx.stroke();
+            });
         }
+
+        ctx.restore();
     }
 }
 

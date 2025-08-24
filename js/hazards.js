@@ -452,7 +452,7 @@ class PoisonGas extends EnvironmentalHazard {
         }
 
         // Apply vision reduction (if player)
-        if (entity === gameManager.player) {
+        if (typeof gameManager !== 'undefined' && gameManager && entity === gameManager.player) {
             entity.visionReduced = true;
         }
     }
@@ -618,7 +618,7 @@ class GravityAnomaly extends EnvironmentalHazard {
         });
 
         // Affect projectiles
-        if (gameManager && gameManager.bullets) {
+        if (typeof gameManager !== 'undefined' && gameManager && gameManager.bullets) {
             gameManager.bullets.forEach(bullet => {
                 if (this.checkCollision(bullet)) {
                     this.affectProjectile(bullet);
@@ -1028,7 +1028,9 @@ class HazardManager {
     // Clear all hazards
     clearAllHazards() {
         this.activeHazards.forEach(hazard => {
-            this.onHazardEnd(hazard, gameManager);
+            if (typeof gameManager !== 'undefined' && gameManager) {
+                this.onHazardEnd(hazard, gameManager);
+            }
         });
         this.activeHazards = [];
     }

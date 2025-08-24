@@ -97,13 +97,26 @@ const ELITE_CONFIGS = {
 };
 
 // Base Elite Enemy Class
-class EliteEnemy extends Enemy {
+class EliteEnemy {
     constructor(x, y, eliteType, level = 1) {
-        super(x, y, level);
+        // Initialize base enemy properties
+        this.x = x;
+        this.y = y;
+        this.level = level;
+        this.health = 100 + (level - 1) * 20;
+        this.maxHealth = this.health;
+        this.damage = 20 + (level - 1) * 5;
+        this.speed = 2;
+        this.radius = 15;
+        this.angle = 0;
+        this.fireRate = 1000;
+        this.lastShot = 0;
+        this.upgradeCount = 0;
+
         this.eliteType = eliteType;
         this.config = ELITE_CONFIGS[eliteType];
         this.isElite = true;
-        
+
         // Apply elite modifiers
         this.health *= this.config.healthMultiplier;
         this.maxHealth = this.health;
@@ -132,14 +145,47 @@ class EliteEnemy extends Enemy {
     }
     
     update(targets, walls) {
-        // Call parent update
-        const bullets = super.update(targets, walls);
-        
+        // Basic enemy update logic
+        const bullets = [];
+
+        // Find closest target for aiming
+        let closestTarget = null;
+        let closestDistance = Infinity;
+
+        targets.forEach(target => {
+            const distance = getDistance(this.x, this.y, target.x, target.y);
+            if (distance < closestDistance) {
+                closestDistance = distance;
+                closestTarget = target;
+            }
+        });
+
+        // Aim at closest target
+        if (closestTarget) {
+            this.angle = getAngle(this.x, this.y, closestTarget.x, closestTarget.y);
+
+            // Basic shooting
+            const now = Date.now();
+            if (now - this.lastShot >= this.fireRate) {
+                this.lastShot = now;
+                bullets.push({
+                    x: this.x,
+                    y: this.y,
+                    vx: Math.cos(this.angle) * 8,
+                    vy: Math.sin(this.angle) * 8,
+                    radius: 3,
+                    damage: this.damage,
+                    isPlayer: false,
+                    color: '#f44'
+                });
+            }
+        }
+
         // Elite-specific behavior
         this.updateEliteBehavior(targets, walls);
         this.updateSpecialAbilities(targets);
         this.updateVisualEffects();
-        
+
         return bullets;
     }
     
@@ -210,8 +256,9 @@ class EliteEnemy extends Enemy {
     }
     
     takeDamage(amount) {
-        super.takeDamage(amount);
-        
+        this.health -= amount;
+        createParticles(this.x, this.y, '#f44', 5);
+
         // Elite death effects
         if (this.health <= 0) {
             this.createEliteDeathEffect();
@@ -233,7 +280,7 @@ class EliteEnemy extends Enemy {
         
         // Screen shake for powerful elites
         if (this.eliteType === 'JUGGERNAUT' || this.eliteType === 'GUARDIAN') {
-            if (gameManager.renderer && gameManager.renderer.addScreenShake) {
+            if (typeof gameManager !== 'undefined' && gameManager && gameManager.renderer && gameManager.renderer.addScreenShake) {
                 gameManager.renderer.addScreenShake(15, 500);
             }
         }
@@ -459,7 +506,7 @@ class BerserkerElite extends EliteEnemy {
         playSound('berserker_rage', 0.5);
 
         // Screen shake
-        if (gameManager.renderer && gameManager.renderer.addScreenShake) {
+        if (typeof gameManager !== 'undefined' && gameManager && gameManager.renderer && gameManager.renderer.addScreenShake) {
             gameManager.renderer.addScreenShake(8, 300);
         }
     }
@@ -566,7 +613,7 @@ class GuardianElite extends EliteEnemy {
 
     protectNearbyAllies() {
         // Find nearby allies and give them damage reduction
-        if (gameManager && gameManager.enemies) {
+        if (typeof gameManager !== 'undefined' && gameManager && gameManager.enemies) {
             gameManager.enemies.forEach(ally => {
                 if (ally.isAlly && ally !== this) {
                     const distance = getDistance(this.x, this.y, ally.x, ally.y);
@@ -703,7 +750,7 @@ class HealerElite extends EliteEnemy {
     healNearbyAllies() {
         let healed = false;
 
-        if (gameManager && gameManager.enemies) {
+        if (typeof gameManager !== 'undefined' && gameManager && gameManager.enemies) {
             gameManager.enemies.forEach(ally => {
                 if (ally.isAlly && ally !== this) {
                     const distance = getDistance(this.x, this.y, ally.x, ally.y);
@@ -746,7 +793,7 @@ class HealerElite extends EliteEnemy {
         // Mass heal - heal all allies on screen
         let healed = false;
 
-        if (gameManager && gameManager.enemies) {
+        if (typeof gameManager !== 'undefined' && gameManager && gameManager.enemies) {
             gameManager.enemies.forEach(ally => {
                 if (ally.isAlly && ally !== this && ally.health < ally.maxHealth) {
                     ally.health = Math.min(ally.maxHealth, ally.health + 50);
@@ -1166,7 +1213,7 @@ class JuggernautElite extends EliteEnemy {
         playSound('ground_slam', 0.8);
 
         // Screen shake
-        if (gameManager.renderer && gameManager.renderer.addScreenShake) {
+        if (typeof gameManager !== 'undefined' && gameManager && gameManager.renderer && gameManager.renderer.addScreenShake) {
             gameManager.renderer.addScreenShake(20, 800);
         }
     }

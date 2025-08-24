@@ -1194,4 +1194,4 @@ class GameManager {
 }
 
 // Create global game manager
-const gameManager = new GameManager();
+let gameManager;

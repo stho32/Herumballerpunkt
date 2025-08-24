@@ -560,10 +560,10 @@ class DefenseStructure {
     updateShieldGenerator(targets, defenseStructures) {
         // Generate shields for nearby structures and allies
         const shieldTargets = [...defenseStructures];
-        if (gameManager && gameManager.allies) {
+        if (typeof gameManager !== 'undefined' && gameManager && gameManager.allies) {
             shieldTargets.push(...gameManager.allies);
         }
-        if (gameManager && gameManager.player) {
+        if (typeof gameManager !== 'undefined' && gameManager && gameManager.player) {
             shieldTargets.push(gameManager.player);
         }
 
@@ -593,7 +593,7 @@ class DefenseStructure {
 
     updateRadarStation(targets) {
         // Provide accuracy bonus to nearby turrets
-        if (gameManager && gameManager.defenseStructures) {
+        if (typeof gameManager !== 'undefined' && gameManager && gameManager.defenseStructures) {
             gameManager.defenseStructures.forEach(structure => {
                 if (structure.type.includes('TURRET')) {
                     const distance = getDistance(this.x, this.y, structure.x, structure.y);
@@ -736,7 +736,7 @@ class DefenseManager {
             }
 
             const projectiles = structure.update(targets, this.structures);
-            if (gameManager && projectiles.length > 0) {
+            if (typeof gameManager !== 'undefined' && gameManager && projectiles.length > 0) {
                 gameManager.bullets.push(...projectiles);
             }
 

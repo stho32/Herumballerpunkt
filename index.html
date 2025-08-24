@@ -24,11 +24,18 @@
         </div>
         <div>Munition: <span id="ammo">30</span>/30</div>
     </div>
+
+    <div id="performanceInfo" style="position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.7); padding: 10px; border-radius: 5px; color: #fff; font-family: monospace; font-size: 12px; display: none;">
+        <div>FPS: <span id="fps">60</span></div>
+        <div>Entities: <span id="entityCount">0</span></div>
+        <div>Quality: <span id="qualityLevel">high</span></div>
+        <div>Collisions: <span id="collisionChecks">0</span></div>
+    </div>
     
     <div id="waveMessage" class="wave-message"></div>
     
     <div id="instructions">
-        WASD/Pfeiltasten: Bewegen | Maus: Zielen | Halten: Dauerfeuer | 1-5: Waffenwechsel | E: Fabrik erobern
+        WASD/Pfeiltasten: Bewegen | Maus: Zielen | Halten: Dauerfeuer | 1-5: Waffenwechsel | E: Fabrik erobern | F3: Performance-Info
     </div>
     
     <div id="gameOver">
@@ -45,6 +52,13 @@
     <!-- Game Scripts -->
     <script src="js/audio.js"></script>
     <script src="js/utils.js"></script>
+
+    <!-- Performance Modules -->
+    <script src="js/performance/quadtree.js"></script>
+    <script src="js/performance/object-pool.js"></script>
+    <script src="js/performance/performance-manager.js"></script>
+    <script src="js/performance/spatial-manager.js"></script>
+
     <script src="js/weapons.js"></script>
     <script src="js/entities.js"></script>
     <script src="js/structures.js"></script>

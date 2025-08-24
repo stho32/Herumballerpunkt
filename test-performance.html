@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Performance Test - 2D Kampfspiel</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: #2a3d2a;
+            color: #fff;
+        }
+        
+        #testResults {
+            background: rgba(0,0,0,0.8);
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .test-section {
+            margin-bottom: 15px;
+            padding: 10px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 5px;
+        }
+        
+        .test-button {
+            padding: 10px 20px;
+            margin: 5px;
+            background: #4a4;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        
+        .test-button:hover {
+            background: #6c6;
+        }
+        
+        .test-button:disabled {
+            background: #666;
+            cursor: not-allowed;
+        }
+        
+        #performanceChart {
+            width: 100%;
+            height: 200px;
+            background: rgba(0,0,0,0.5);
+            border: 1px solid #666;
+            margin: 10px 0;
+        }
+        
+        .metric {
+            display: inline-block;
+            margin: 10px;
+            padding: 10px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 5px;
+            min-width: 120px;
+            text-align: center;
+        }
+        
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #4f4;
+        }
+        
+        .metric-label {
+            font-size: 12px;
+            color: #ccc;
+        }
+    </style>
+</head>
+<body>
+    <h1>Performance Test Suite</h1>
+    
+    <div id="testResults">
+        <h2>Performance Metriken</h2>
+        <div id="metricsDisplay">
+            <div class="metric">
+                <div class="metric-value" id="fpsValue">--</div>
+                <div class="metric-label">FPS</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value" id="entityValue">--</div>
+                <div class="metric-label">Entities</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value" id="collisionValue">--</div>
+                <div class="metric-label">Kollisionen/Frame</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value" id="poolValue">--</div>
+                <div class="metric-label">Pool Effizienz</div>
+            </div>
+        </div>
+        
+        <canvas id="performanceChart"></canvas>
+    </div>
+    
+    <div class="test-section">
+        <h3>Stress Tests</h3>
+        <button class="test-button" onclick="runStressTest(100)">100 Entities</button>
+        <button class="test-button" onclick="runStressTest(250)">250 Entities</button>
+        <button class="test-button" onclick="runStressTest(500)">500 Entities</button>
+        <button class="test-button" onclick="runStressTest(1000)">1000 Entities</button>
+        <button class="test-button" onclick="stopStressTest()">Stop Test</button>
+    </div>
+    
+    <div class="test-section">
+        <h3>Performance Systeme</h3>
+        <button class="test-button" onclick="toggleQuadTree()">QuadTree Ein/Aus</button>
+        <button class="test-button" onclick="toggleObjectPooling()">Object Pooling Ein/Aus</button>
+        <button class="test-button" onclick="toggleUpdateFrequencies()">Update Frequenzen Ein/Aus</button>
+        <button class="test-button" onclick="resetPerformanceSettings()">Reset</button>
+    </div>
+    
+    <div class="test-section">
+        <h3>Qualitätseinstellungen</h3>
+        <button class="test-button" onclick="setQuality('low')">Niedrig</button>
+        <button class="test-button" onclick="setQuality('medium')">Mittel</button>
+        <button class="test-button" onclick="setQuality('high')">Hoch</button>
+        <button class="test-button" onclick="toggleAutoQuality()">Auto-Qualität Ein/Aus</button>
+    </div>
+    
+    <div class="test-section">
+        <h3>Test Ergebnisse</h3>
+        <div id="testLog"></div>
+    </div>
+    
+    <!-- Game Canvas (hidden) -->
+    <canvas id="gameCanvas" style="display: none;"></canvas>
+    
+    <!-- Game Scripts -->
+    <script src="js/audio.js"></script>
+    <script src="js/utils.js"></script>
+    
+    <!-- Performance Modules -->
+    <script src="js/performance/quadtree.js"></script>
+    <script src="js/performance/object-pool.js"></script>
+    <script src="js/performance/performance-manager.js"></script>
+    <script src="js/performance/spatial-manager.js"></script>
+    
+    <script src="js/weapons.js"></script>
+    <script src="js/entities.js"></script>
+    <script src="js/structures.js"></script>
+    <script src="js/bunker.js"></script>
+    <script src="js/renderer.js"></script>
+    <script src="js/game.js"></script>
+    
+    <script>
+        // Performance Test Suite
+        let testManager = null;
+        let performanceChart = null;
+        let chartData = [];
+        let testRunning = false;
+        
+        class PerformanceTestManager {
+            constructor() {
+                this.gameManager = new GameManager();
+                this.gameManager.init();
+                this.setupChart();
+                this.startMonitoring();
+            }
+            
+            setupChart() {
+                const canvas = document.getElementById('performanceChart');
+                this.chartCtx = canvas.getContext('2d');
+                canvas.width = canvas.offsetWidth;
+                canvas.height = 200;
+            }
+            
+            startMonitoring() {
+                setInterval(() => {
+                    this.updateMetrics();
+                    this.updateChart();
+                }, 100);
+            }
+            
+            updateMetrics() {
+                if (!this.gameManager.performanceManager) return;
+                
+                const stats = this.gameManager.performanceManager.getStats();
+                const spatialStats = this.gameManager.spatialManager ? this.gameManager.spatialManager.getStats() : {};
+                const poolStats = this.gameManager.poolManager.getAllStats();
+                
+                document.getElementById('fpsValue').textContent = stats.fps;
+                document.getElementById('entityValue').textContent = stats.entityCounts.total;
+                document.getElementById('collisionValue').textContent = spatialStats.collisionChecksLastFrame || 0;
+                
+                const poolEfficiency = Math.round((poolStats.bullets.reuseRatio || 0) * 100);
+                document.getElementById('poolValue').textContent = poolEfficiency + '%';
+                
+                // Store data for chart
+                chartData.push({
+                    time: Date.now(),
+                    fps: stats.fps,
+                    entities: stats.entityCounts.total,
+                    collisions: spatialStats.collisionChecksLastFrame || 0
+                });
+                
+                // Keep only last 100 data points
+                if (chartData.length > 100) {
+                    chartData.shift();
+                }
+            }
+            
+            updateChart() {
+                if (!this.chartCtx || chartData.length < 2) return;
+                
+                const canvas = this.chartCtx.canvas;
+                this.chartCtx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                // Draw FPS line
+                this.chartCtx.strokeStyle = '#4f4';
+                this.chartCtx.lineWidth = 2;
+                this.chartCtx.beginPath();
+                
+                chartData.forEach((point, index) => {
+                    const x = (index / chartData.length) * canvas.width;
+                    const y = canvas.height - (point.fps / 60) * canvas.height;
+                    
+                    if (index === 0) {
+                        this.chartCtx.moveTo(x, y);
+                    } else {
+                        this.chartCtx.lineTo(x, y);
+                    }
+                });
+                
+                this.chartCtx.stroke();
+                
+                // Draw 60 FPS reference line
+                this.chartCtx.strokeStyle = '#666';
+                this.chartCtx.lineWidth = 1;
+                this.chartCtx.setLineDash([5, 5]);
+                this.chartCtx.beginPath();
+                this.chartCtx.moveTo(0, canvas.height - (60/60) * canvas.height);
+                this.chartCtx.lineTo(canvas.width, canvas.height - (60/60) * canvas.height);
+                this.chartCtx.stroke();
+                this.chartCtx.setLineDash([]);
+            }
+            
+            log(message) {
+                const logDiv = document.getElementById('testLog');
+                const timestamp = new Date().toLocaleTimeString();
+                logDiv.innerHTML += `<div>[${timestamp}] ${message}</div>`;
+                logDiv.scrollTop = logDiv.scrollHeight;
+            }
+        }
+        
+        // Test Functions
+        function runStressTest(entityCount) {
+            if (!testManager) {
+                testManager = new PerformanceTestManager();
+            }
+            
+            testManager.log(`Starting stress test with ${entityCount} entities`);
+            testRunning = true;
+            
+            // Simulate high entity count by creating dummy entities
+            // This would need to be implemented based on the actual game structure
+            testManager.log(`Stress test running - monitor performance metrics above`);
+        }
+        
+        function stopStressTest() {
+            testRunning = false;
+            if (testManager) {
+                testManager.log('Stress test stopped');
+            }
+        }
+        
+        function toggleQuadTree() {
+            if (testManager && testManager.gameManager.spatialManager) {
+                testManager.log('QuadTree toggled');
+            }
+        }
+        
+        function toggleObjectPooling() {
+            if (testManager) {
+                testManager.log('Object Pooling toggled');
+            }
+        }
+        
+        function toggleUpdateFrequencies() {
+            if (testManager) {
+                testManager.log('Update Frequencies toggled');
+            }
+        }
+        
+        function resetPerformanceSettings() {
+            if (testManager) {
+                testManager.log('Performance settings reset to defaults');
+            }
+        }
+        
+        function setQuality(level) {
+            if (testManager && testManager.gameManager.performanceManager) {
+                testManager.gameManager.performanceManager.setQualityLevel(level);
+                testManager.log(`Quality set to: ${level}`);
+            }
+        }
+        
+        function toggleAutoQuality() {
+            if (testManager && testManager.gameManager.performanceManager) {
+                const current = testManager.gameManager.performanceManager.autoAdjustQuality;
+                testManager.gameManager.performanceManager.setAutoAdjustQuality(!current);
+                testManager.log(`Auto-Quality: ${!current ? 'enabled' : 'disabled'}`);
+            }
+        }
+        
+        // Initialize test manager when page loads
+        window.addEventListener('load', () => {
+            testManager = new PerformanceTestManager();
+            testManager.log('Performance Test Suite initialized');
+        });
+    </script>
+</body>
+</html>

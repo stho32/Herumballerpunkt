@@ -1,9 +1,18 @@
 // Utility functions
 
-// Particle system
+// Particle system - now optimized with object pooling
 let particles = [];
+let particlePool = null; // Will be set by game manager
 
 function createParticles(x, y, color, count = 10) {
+    // Use optimized particle creation if pool is available
+    if (particlePool && typeof gameManager !== 'undefined' && gameManager.poolManager) {
+        const newParticles = gameManager.poolManager.particlePool.createParticle(x, y, color, count);
+        particles.push(...newParticles);
+        return;
+    }
+
+    // Fallback to old system
     for (let i = 0; i < count; i++) {
         particles.push({
             x: x,
@@ -12,22 +21,38 @@ function createParticles(x, y, color, count = 10) {
             vy: (Math.random() - 0.5) * 8,
             radius: Math.random() * 3 + 1,
             color: color,
-            lifetime: 30
+            lifetime: 30,
+            active: true
         });
     }
 }
 
 function updateParticles() {
-    particles.forEach((particle, index) => {
+    // Optimized particle update with object pooling
+    particles = particles.filter((particle, index) => {
         particle.x += particle.vx;
         particle.y += particle.vy;
         particle.vx *= 0.95;
         particle.vy *= 0.95;
-        particle.lifetime--;
-        
-        if (particle.lifetime <= 0) {
-            particles.splice(index, 1);
+
+        // Handle pooled particles
+        if (particle.life !== undefined) {
+            particle.life++;
+            if (particle.life >= particle.maxLife) {
+                if (particlePool && typeof gameManager !== 'undefined' && gameManager.poolManager) {
+                    gameManager.poolManager.particlePool.releaseParticle(particle);
+                }
+                return false;
+            }
+        } else {
+            // Handle old-style particles
+            particle.lifetime--;
+            if (particle.lifetime <= 0) {
+                return false;
+            }
         }
+
+        return true;
     });
 }
 

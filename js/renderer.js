@@ -456,10 +456,25 @@ class Renderer {
     
     drawParticle(particle) {
         this.ctx.fillStyle = particle.color;
-        this.ctx.globalAlpha = particle.lifetime / 30;
-        this.ctx.beginPath();
-        this.ctx.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
-        this.ctx.fill();
+
+        // Handle both old and new particle systems
+        if (particle.lifetime !== undefined) {
+            // Old particle system
+            this.ctx.globalAlpha = particle.lifetime / 30;
+            const radius = particle.radius || 2;
+            this.ctx.beginPath();
+            this.ctx.arc(particle.x, particle.y, radius, 0, Math.PI * 2);
+            this.ctx.fill();
+        } else if (particle.life !== undefined && particle.maxLife !== undefined) {
+            // New pooled particle system
+            const lifeRatio = 1 - (particle.life / particle.maxLife);
+            this.ctx.globalAlpha = lifeRatio;
+            const radius = particle.size || 2;
+            this.ctx.beginPath();
+            this.ctx.arc(particle.x, particle.y, radius, 0, Math.PI * 2);
+            this.ctx.fill();
+        }
+
         this.ctx.globalAlpha = 1;
     }
     

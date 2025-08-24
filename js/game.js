@@ -8,7 +8,12 @@ class GameManager {
         this.canvas = canvas;
         this.ctx = ctx;
         this.renderer = new Renderer(canvas, ctx);
-        
+
+        // Performance systems
+        this.performanceManager = new PerformanceManager();
+        this.poolManager = new PoolManager();
+        this.spatialManager = null; // Will be initialized when canvas size is known
+
         // Game state
         this.gameActive = false;
         this.score = 0;
@@ -17,6 +22,9 @@ class GameManager {
         this.waveEnemies = [];
         this.animationId = null;
         this.difficulty = 'normal'; // easy, normal, hard
+
+        // Performance UI toggle
+        this.showPerformanceInfo = false;
         
         // Difficulty multipliers
         this.difficultyMultipliers = {
@@ -68,11 +76,35 @@ class GameManager {
         // Set canvas size
         this.canvas.width = window.innerWidth;
         this.canvas.height = window.innerHeight;
-        
+
+        // Initialize spatial manager with canvas bounds
+        this.spatialManager = new SpatialManager({
+            x: 0,
+            y: 0,
+            width: this.canvas.width,
+            height: this.canvas.height
+        });
+
         // Handle resize
         window.addEventListener('resize', () => {
             this.canvas.width = window.innerWidth;
             this.canvas.height = window.innerHeight;
+
+            // Reinitialize spatial manager with new bounds
+            this.spatialManager = new SpatialManager({
+                x: 0,
+                y: 0,
+                width: this.canvas.width,
+                height: this.canvas.height
+            });
+        });
+
+        // Add performance info toggle
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'F3') {
+                e.preventDefault();
+                this.togglePerformanceInfo();
+            }
         });
     }
     
@@ -380,121 +412,172 @@ class GameManager {
         // Update player
         this.player.update(this.keys, this.mouse, this.walls);
         
-        // Player shooting
+        // Player shooting - use optimized bullet creation
         if (this.player.isFiring) {
             const bullets = this.player.shoot(this.mouse.x, this.mouse.y);
-            this.bullets.push(...bullets);
+            const optimizedBullets = this.convertBulletsToPooled(bullets);
+            this.bullets.push(...optimizedBullets);
         }
-        
+
         // Player weapon upgrades
         const upgradeBullets = this.player.weaponSystem.updateUpgrades(
             this.player.x, this.player.y, this.mouse.x, this.mouse.y
         );
-        this.bullets.push(...upgradeBullets);
-        
+        if (upgradeBullets.length > 0) {
+            const optimizedUpgradeBullets = this.convertBulletsToPooled(upgradeBullets);
+            this.bullets.push(...optimizedUpgradeBullets);
+        }
+
         // Fire shield
         const shieldFlames = this.player.weaponSystem.updateShield(this.player.x, this.player.y);
-        this.bullets.push(...shieldFlames);
+        if (shieldFlames.length > 0) {
+            const optimizedShieldFlames = this.convertBulletsToPooled(shieldFlames);
+            this.bullets.push(...optimizedShieldFlames);
+        }
         
-        // Update enemies
+        // Update enemies - with optimized bullet creation and update frequencies
         const allTargets = [this.player, ...this.allies];
         this.enemies = this.enemies.filter(enemy => {
+            let bullets = [];
+
+            // Determine update frequency based on entity type
+            let shouldUpdate = true;
             if (enemy instanceof Superboss) {
-                const bullets = enemy.update(allTargets, this.walls, this);
-                this.bullets.push(...bullets);
+                // Superboss always updates (critical)
+                shouldUpdate = this.performanceManager.shouldUpdate('critical');
             } else if (enemy instanceof Tank) {
-                const bullets = enemy.update(this.enemies.filter(e => e.isAlly !== enemy.isAlly), 
-                                           this.allies.filter(a => a.isAlly !== enemy.isAlly), this.walls);
-                this.bullets.push(...bullets);
-            } else if (enemy instanceof Ally) {
-                const bullets = enemy.update(
-                    enemy.isAlly ? this.enemies.filter(e => !e.isAlly) : allTargets,
-                    enemy.isAlly ? this.allies : [],
-                    this.walls
-                );
-                this.bullets.push(...bullets);
+                // Tanks update at standard frequency
+                shouldUpdate = this.performanceManager.shouldUpdate('standard');
             } else {
-                const bullets = enemy.update(allTargets, this.walls);
-                this.bullets.push(...bullets);
+                // Regular enemies update at standard frequency
+                shouldUpdate = this.performanceManager.shouldUpdate('standard');
             }
+
+            if (shouldUpdate) {
+                if (enemy instanceof Superboss) {
+                    bullets = enemy.update(allTargets, this.walls, this);
+                } else if (enemy instanceof Tank) {
+                    bullets = enemy.update(this.enemies.filter(e => e.isAlly !== enemy.isAlly),
+                                         this.allies.filter(a => a.isAlly !== enemy.isAlly), this.walls);
+                } else if (enemy instanceof Ally) {
+                    bullets = enemy.update(
+                        enemy.isAlly ? this.enemies.filter(e => !e.isAlly) : allTargets,
+                        enemy.isAlly ? this.allies : [],
+                        this.walls
+                    );
+                } else {
+                    bullets = enemy.update(allTargets, this.walls);
+                }
+
+                if (bullets.length > 0) {
+                    const optimizedBullets = this.convertBulletsToPooled(bullets);
+                    this.bullets.push(...optimizedBullets);
+                }
+            }
+
             return enemy.health > 0;
         });
-        
-        // Update allies
+
+        // Update allies - with optimized bullet creation and update frequencies
         this.allies = this.allies.filter(ally => {
-            if (ally instanceof Tank) {
-                const bullets = ally.update(this.enemies.filter(e => !e.isAlly), this.allies, this.walls);
-                this.bullets.push(...bullets);
-            } else {
-                const bullets = ally.update(this.enemies.filter(e => !e.isAlly), this.allies, this.walls);
-                this.bullets.push(...bullets);
+            let bullets = [];
+
+            // Allies update at standard frequency
+            const shouldUpdate = this.performanceManager.shouldUpdate('standard');
+
+            if (shouldUpdate) {
+                if (ally instanceof Tank) {
+                    bullets = ally.update(this.enemies.filter(e => !e.isAlly), this.allies, this.walls);
+                } else {
+                    bullets = ally.update(this.enemies.filter(e => !e.isAlly), this.allies, this.walls);
+                }
+
+                if (bullets.length > 0) {
+                    const optimizedBullets = this.convertBulletsToPooled(bullets);
+                    this.bullets.push(...optimizedBullets);
+                }
             }
+
             return ally.health > 0;
         });
         
-        // Update bunker
+        // Update bunker - with optimized bullet creation
         if (this.bunker) {
             const allEnemies = [...this.enemies.filter(e => !e.isAlly)];
             this.enemySquads.forEach(squad => {
                 allEnemies.push(...squad.members);
             });
-            
+
             const bunkerBullets = this.bunker.update(allEnemies);
-            this.bullets.push(...bunkerBullets);
-            
+            if (bunkerBullets.length > 0) {
+                const optimizedBunkerBullets = this.convertBulletsToPooled(bunkerBullets);
+                this.bullets.push(...optimizedBunkerBullets);
+            }
+
             if (this.bunker.health <= 0) {
-                createParticles(this.bunker.x, this.bunker.y, '#f44', 50);
+                this.createOptimizedParticles(this.bunker.x, this.bunker.y, '#f44', 50);
                 playSound('explosion', 1.0);
                 this.bunker = null;
             }
         }
-        
-        // Update enemy squads
+
+        // Update enemy squads - with optimized bullet creation
         this.enemySquads = this.enemySquads.filter(squad => {
             const allTargets = [this.player, ...this.allies];
             if (this.bunker) allTargets.push(this.bunker);
-            
+
             const result = squad.update(allTargets, this.walls);
-            this.bullets.push(...result.bullets);
-            
+            if (result.bullets && result.bullets.length > 0) {
+                const optimizedSquadBullets = this.convertBulletsToPooled(result.bullets);
+                this.bullets.push(...optimizedSquadBullets);
+            }
+
             return !result.destroyed;
         });
         
-        // Update turrets
+        // Update turrets - with optimized bullet creation
         this.turrets = this.turrets.filter(turret => {
-            const allEnemies = [...this.enemies.filter(e => !e.isAlly), 
+            const allEnemies = [...this.enemies.filter(e => !e.isAlly),
                                ...this.turrets.filter(t => t.isAlly !== turret.isAlly)];
             const allAllies = [...this.allies, ...this.turrets.filter(t => t.isAlly === turret.isAlly)];
-            
+
             const bullets = turret.update(
                 turret.isAlly ? allEnemies : allTargets,
                 turret.isAlly ? allAllies : this.enemies.filter(e => e.isAlly)
             );
-            this.bullets.push(...bullets);
-            
+
+            if (bullets.length > 0) {
+                const optimizedTurretBullets = this.convertBulletsToPooled(bullets);
+                this.bullets.push(...optimizedTurretBullets);
+            }
+
             return turret.health > 0;
         });
         
-        // Update factories
-        this.factories = this.factories.filter(factory => {
-            factory.update(this.player, this.enemies.filter(e => !e.isAlly));
-            
-            // Count soldiers for this factory
-            factory.soldiers = 0;
-            [...this.allies, ...this.enemies].forEach(unit => {
-                if (unit instanceof Ally && unit.factory === factory) {
-                    factory.soldiers++;
-                }
+        // Update factories - background frequency
+        if (this.performanceManager.shouldUpdate('background')) {
+            this.factories = this.factories.filter(factory => {
+                factory.update(this.player, this.enemies.filter(e => !e.isAlly));
+
+                // Count soldiers for this factory
+                factory.soldiers = 0;
+                [...this.allies, ...this.enemies].forEach(unit => {
+                    if (unit instanceof Ally && unit.factory === factory) {
+                        factory.soldiers++;
+                    }
+                });
+
+                return factory.health > 0;
             });
-            
-            return factory.health > 0;
-        });
-        
-        // Update walls
-        this.walls = this.walls.filter(wall => {
-            wall.update();
-            return wall.health > 0;
-        });
+        }
+
+        // Update walls - background frequency
+        if (this.performanceManager.shouldUpdate('background')) {
+            this.walls = this.walls.filter(wall => {
+                wall.update();
+                return wall.health > 0;
+            });
+        }
         
         // Update bullets
         this.updateBullets();
@@ -522,271 +605,284 @@ class GameManager {
     
     updateBullets() {
         this.bullets = this.bullets.filter(bullet => {
+            // Update bullet position
             bullet.x += bullet.vx;
             bullet.y += bullet.vy;
-            
+
             // Update bullet properties
             if (bullet.lifetime !== undefined) {
                 bullet.lifetime--;
-                if (bullet.lifetime <= 0) return false;
+                if (bullet.lifetime <= 0) {
+                    this.poolManager.bulletPool.releaseBullet(bullet);
+                    return false;
+                }
             }
-            
+
             if (bullet.flame) {
                 bullet.radius = Math.min(bullet.radius + 0.5, 20);
                 bullet.vx *= 0.95;
                 bullet.vy *= 0.95;
             }
-            
-            // Homing missiles
+
+            // Homing missiles - use spatial manager for efficient enemy finding
             if (bullet.homing) {
-                let closestEnemy = null;
-                let closestDist = 200;
-                
-                this.enemies.forEach(enemy => {
-                    const dist = getDistance(bullet.x, bullet.y, enemy.x, enemy.y);
-                    if (dist < closestDist) {
-                        closestDist = dist;
-                        closestEnemy = enemy;
+                const nearbyEnemies = this.spatialManager.getEntitiesInRadius(
+                    bullet.x, bullet.y, 200, 'enemies'
+                );
+
+                if (nearbyEnemies.length > 0) {
+                    let closestEnemy = nearbyEnemies[0];
+                    let closestDist = getDistance(bullet.x, bullet.y, closestEnemy.x, closestEnemy.y);
+
+                    for (let i = 1; i < nearbyEnemies.length; i++) {
+                        const dist = getDistance(bullet.x, bullet.y, nearbyEnemies[i].x, nearbyEnemies[i].y);
+                        if (dist < closestDist) {
+                            closestDist = dist;
+                            closestEnemy = nearbyEnemies[i];
+                        }
                     }
-                });
-                
-                if (closestEnemy) {
+
                     const angle = getAngle(bullet.x, bullet.y, closestEnemy.x, closestEnemy.y);
                     bullet.vx = lerp(bullet.vx, Math.cos(angle) * 10, 0.1);
                     bullet.vy = lerp(bullet.vy, Math.sin(angle) * 10, 0.1);
                 }
             }
-            
-            // Out of bounds
-            if (bullet.x < -50 || bullet.x > this.canvas.width + 50 || 
+
+            // Out of bounds check
+            if (bullet.x < -50 || bullet.x > this.canvas.width + 50 ||
                 bullet.y < -50 || bullet.y > this.canvas.height + 50) {
+                this.poolManager.bulletPool.releaseBullet(bullet);
+                return false;
+            }
+
+            // Use spatial manager for wall collision detection
+            const nearbyWalls = this.spatialManager.getPotentialCollisions(bullet);
+            let hitWall = false;
+
+            for (const wall of nearbyWalls) {
+                if (this.spatialManager.entityCategories.walls.includes(wall)) {
+                    if (this.spatialManager.checkWallCollision(bullet, wall)) {
+                        wall.takeDamage(10);
+                        this.createOptimizedParticles(bullet.x, bullet.y, '#888', 5);
+                        hitWall = true;
+                        break;
+                    }
+                }
+            }
+
+            if (hitWall) {
+                this.poolManager.bulletPool.releaseBullet(bullet);
                 return false;
             }
             
-            // Wall collision
-            let hitWall = false;
-            this.walls.forEach(wall => {
-                if (bullet.x > wall.x && bullet.x < wall.x + wall.width &&
-                    bullet.y > wall.y && bullet.y < wall.y + wall.height) {
-                    wall.takeDamage(10);
-                    createParticles(bullet.x, bullet.y, '#888', 5);
-                    hitWall = true;
-                }
-            });
-            if (hitWall) return false;
-            
-            // Handle collisions
-            if (bullet.isPlayer) {
-                // Check enemy hits
-                this.enemies.forEach(enemy => {
-                    if (checkCollision(bullet, enemy)) {
-                        enemy.takeDamage(bullet.damage);
-                        createParticles(bullet.x, bullet.y, '#ff4');
+            // Optimized collision detection using spatial partitioning
+            return this.handleBulletCollisions(bullet);
+        });
+    }
+
+    handleBulletCollisions(bullet) {
+        // Get potential collision targets using spatial manager
+        const potentialTargets = this.spatialManager.getPotentialCollisions(bullet);
+
+        if (bullet.isPlayer) {
+            // Player bullets hit enemies
+            for (const target of potentialTargets) {
+                if (this.spatialManager.entityCategories.enemies.includes(target)) {
+                    if (this.spatialManager.checkCollision(bullet, target)) {
+                        target.takeDamage(bullet.damage);
+                        this.createOptimizedParticles(bullet.x, bullet.y, '#ff4');
                         playSound('hit', 0.1);
-                        
-                        if (enemy.health <= 0) {
-                            // Superboss rewards
-                            if (enemy instanceof Superboss) {
-                                this.lastBossWave = this.wave; // Track boss defeat for reorganization
-                                this.score += 1000 * this.wave;
-                                // Guaranteed multiple drops
-                                for (let i = 0; i < 5; i++) {
-                                    const angle = (i / 5) * Math.PI * 2;
-                                    const dist = 50;
-                                    const x = enemy.x + Math.cos(angle) * dist;
-                                    const y = enemy.y + Math.sin(angle) * dist;
-                                    if (i < 2) {
-                                        this.pickups.push(createUpgradePickup(x, y));
-                                    } else if (i === 2) {
-                                        this.pickups.push({
-                                            x, y,
-                                            type: 'allyBoost',
-                                            radius: 15,
-                                            lifetime: 15000,
-                                            created: Date.now()
-                                        });
-                                    } else {
-                                        this.pickups.push({
-                                            x, y,
-                                            type: 'health',
-                                            radius: 10,
-                                            lifetime: 10000,
-                                            created: Date.now()
-                                        });
-                                    }
-                                }
-                            } else {
-                                this.score += enemy instanceof Tank ? 50 : 10;
-                                const pickupChance = this.difficultyMultipliers[this.difficulty].pickupChance || 0.3;
-                                if (Math.random() < pickupChance) {
-                                    this.spawnPickup(enemy.x, enemy.y);
-                                }
-                            }
-                            
-                            if (bullet.explosive) {
-                                const explosion = createExplosion(enemy.x, enemy.y);
-                                this.applyExplosionDamage(explosion);
-                            }
+
+                        if (target.health <= 0) {
+                            this.handleEnemyDeath(target, bullet);
                         }
-                        
-                        hitWall = true;
-                    }
-                });
-                
-                // Check enemy squad member hits
-                this.enemySquads.forEach(squad => {
-                    squad.members.forEach(member => {
-                        if (checkCollision(bullet, member)) {
-                            member.takeDamage(bullet.damage);
-                            createParticles(bullet.x, bullet.y, '#ff4');
-                            playSound('hit', 0.1);
-                            
-                            if (member.health <= 0) {
-                                this.score += 15; // Squad members worth more points
-                                if (Math.random() < 0.4) { // Higher drop chance
-                                    this.spawnPickup(member.x, member.y);
-                                }
-                            }
-                            
-                            hitWall = true;
-                        }
-                    });
-                });
-                
-                // Check enemy turret hits
-                this.turrets.forEach(turret => {
-                    if (!turret.isAlly && checkCollision(bullet, turret)) {
-                        turret.takeDamage(bullet.damage);
-                        createParticles(bullet.x, bullet.y, '#ff4');
-                        
-                        if (turret.health <= 0) {
-                            this.score += 50;
-                            if (Math.random() < 0.5) {
-                                this.spawnPickup(turret.x, turret.y);
-                            }
-                            
-                            if (bullet.explosive) {
-                                const explosion = createExplosion(turret.x, turret.y);
-                                this.applyExplosionDamage(explosion);
-                            }
-                        }
-                        
-                        hitWall = true;
-                    }
-                });
-            } else if (bullet.isAlly) {
-                // Allied bullets hit enemies
-                this.enemies.forEach(enemy => {
-                    if (!enemy.isAlly && checkCollision(bullet, enemy)) {
-                        enemy.takeDamage(bullet.damage);
-                        createParticles(bullet.x, bullet.y, '#ff4');
-                        
-                        // When allies kill enemies, higher chance for upgrade drops
-                        if (enemy.health <= 0) {
-                            this.score += enemy instanceof Tank ? 25 : 5; // Half points for ally kills
-                            if (Math.random() < 0.5) { // Higher drop chance from ally kills
-                                this.spawnPickup(enemy.x, enemy.y, true);
-                            }
-                        }
-                        
-                        hitWall = true;
-                    }
-                });
-                
-                // Allied bullets hit enemy squad members  
-                this.enemySquads.forEach(squad => {
-                    squad.members.forEach(member => {
-                        if (checkCollision(bullet, member)) {
-                            member.takeDamage(bullet.damage);
-                            createParticles(bullet.x, bullet.y, '#ff4');
-                            
-                            if (member.health <= 0) {
-                                this.score += 8; // Less points for ally kills
-                                if (Math.random() < 0.5) {
-                                    this.spawnPickup(member.x, member.y, true);
-                                }
-                            }
-                            
-                            hitWall = true;
-                        }
-                    });
-                });
-                
-                // Hit enemy turrets
-                this.turrets.forEach(turret => {
-                    if (!turret.isAlly && checkCollision(bullet, turret)) {
-                        turret.takeDamage(bullet.damage);
-                        createParticles(bullet.x, bullet.y, '#ff4');
-                        hitWall = true;
-                    }
-                });
-            } else {
-                // Enemy bullets hit player and allies
-                if (checkCollision(bullet, this.player)) {
-                    this.player.takeDamage(bullet.damage);
-                    hitWall = true;
-                }
-                
-                this.allies.forEach(ally => {
-                    if (checkCollision(bullet, ally)) {
-                        ally.takeDamage(bullet.damage);
-                        createParticles(bullet.x, bullet.y, '#f44');
-                        hitWall = true;
-                    }
-                });
-                
-                // Check bunker collisions
-                if (this.bunker && !this.bunker.isConstructing) {
-                    let bunkerHit = false;
-                    
-                    // First check individual turrets
-                    this.bunker.modules.forEach((module, moduleIndex) => {
-                        if (bunkerHit) return;
-                        
-                        module.turrets.forEach((turret, turretIndex) => {
-                            if (bunkerHit || turret.health <= 0) return;
-                            
-                            const turretPos = this.bunker.getTurretPosition(moduleIndex, turretIndex);
-                            const turretDist = getDistance(bullet.x, bullet.y, turretPos.x, turretPos.y);
-                            
-                            if (turretDist < 25) { // Turret hit radius
-                                this.bunker.takeDamage(bullet.damage, moduleIndex, turretIndex);
-                                createParticles(bullet.x, bullet.y, '#f44');
-                                hitWall = true;
-                                bunkerHit = true;
-                            }
-                        });
-                    });
-                    
-                    // If no turret hit, check modules and main bunker
-                    if (!bunkerHit) {
-                        const bunkerDist = getDistance(bullet.x, bullet.y, this.bunker.x, this.bunker.y);
-                        if (bunkerDist < this.bunker.radius) {
-                            // Find closest module
-                            let closestModuleIndex = -1;
-                            let closestDistance = this.bunker.radius;
-                            
-                            this.bunker.modules.forEach((module, index) => {
-                                if (module.health > 0) {
-                                    const modulePos = this.bunker.getModulePosition(index);
-                                    const dist = getDistance(bullet.x, bullet.y, modulePos.x, modulePos.y);
-                                    if (dist < 30 && dist < closestDistance) {
-                                        closestDistance = dist;
-                                        closestModuleIndex = index;
-                                    }
-                                }
-                            });
-                            
-                            this.bunker.takeDamage(bullet.damage, closestModuleIndex);
-                            createParticles(bullet.x, bullet.y, '#f44');
-                            hitWall = true;
-                        }
+
+                        this.poolManager.bulletPool.releaseBullet(bullet);
+                        return false; // Remove bullet
                     }
                 }
             }
-            
-            return !hitWall;
-        });
+
+            // Check enemy squad members
+            for (const squad of this.enemySquads) {
+                for (const member of squad.members) {
+                    if (this.spatialManager.checkCollision(bullet, member)) {
+                        member.takeDamage(bullet.damage);
+                        this.createOptimizedParticles(bullet.x, bullet.y, '#ff4');
+                        playSound('hit', 0.1);
+
+                        if (member.health <= 0) {
+                            this.score += 15;
+                            if (Math.random() < 0.4) {
+                                this.spawnPickup(member.x, member.y);
+                            }
+                        }
+
+                        this.poolManager.bulletPool.releaseBullet(bullet);
+                        return false;
+                    }
+                }
+            }
+
+            // Check enemy turrets
+            for (const turret of this.turrets) {
+                if (!turret.isAlly && this.spatialManager.checkCollision(bullet, turret)) {
+                    turret.takeDamage(bullet.damage);
+                    this.createOptimizedParticles(bullet.x, bullet.y, '#ff4');
+
+                    if (turret.health <= 0) {
+                        this.score += 50;
+                        if (Math.random() < 0.5) {
+                            this.spawnPickup(turret.x, turret.y);
+                        }
+
+                        if (bullet.explosive) {
+                            const explosion = createExplosion(turret.x, turret.y);
+                            this.applyExplosionDamage(explosion);
+                        }
+                    }
+
+                    this.poolManager.bulletPool.releaseBullet(bullet);
+                    return false;
+                }
+        } else if (bullet.isAlly) {
+            // Allied bullets hit enemies
+            for (const target of potentialTargets) {
+                if (this.spatialManager.entityCategories.enemies.includes(target) && !target.isAlly) {
+                    if (this.spatialManager.checkCollision(bullet, target)) {
+                        target.takeDamage(bullet.damage);
+                        this.createOptimizedParticles(bullet.x, bullet.y, '#ff4');
+
+                        if (target.health <= 0) {
+                            this.score += target instanceof Tank ? 25 : 5;
+                            if (Math.random() < 0.5) {
+                                this.spawnPickup(target.x, target.y, true);
+                            }
+                        }
+
+                        this.poolManager.bulletPool.releaseBullet(bullet);
+                        return false;
+                    }
+                }
+            }
+
+            // Check enemy squad members
+            for (const squad of this.enemySquads) {
+                for (const member of squad.members) {
+                    if (this.spatialManager.checkCollision(bullet, member)) {
+                        member.takeDamage(bullet.damage);
+                        this.createOptimizedParticles(bullet.x, bullet.y, '#ff4');
+
+                        if (member.health <= 0) {
+                            this.score += 8;
+                            if (Math.random() < 0.5) {
+                                this.spawnPickup(member.x, member.y, true);
+                            }
+                        }
+
+                        this.poolManager.bulletPool.releaseBullet(bullet);
+                        return false;
+                    }
+                }
+            }
+
+            // Hit enemy turrets
+            for (const turret of this.turrets) {
+                if (!turret.isAlly && this.spatialManager.checkCollision(bullet, turret)) {
+                    turret.takeDamage(bullet.damage);
+                    this.createOptimizedParticles(bullet.x, bullet.y, '#ff4');
+                    this.poolManager.bulletPool.releaseBullet(bullet);
+                    return false;
+                }
+        } else {
+            // Enemy bullets hit player and allies
+            if (this.spatialManager.checkCollision(bullet, this.player)) {
+                this.player.takeDamage(bullet.damage);
+                this.poolManager.bulletPool.releaseBullet(bullet);
+                return false;
+            }
+
+            for (const target of potentialTargets) {
+                if (this.spatialManager.entityCategories.allies.includes(target)) {
+                    if (this.spatialManager.checkCollision(bullet, target)) {
+                        target.takeDamage(bullet.damage);
+                        this.createOptimizedParticles(bullet.x, bullet.y, '#f44');
+                        this.poolManager.bulletPool.releaseBullet(bullet);
+                        return false;
+                    }
+                }
+            }
+
+            // Check bunker collisions (simplified for now)
+            if (this.bunker && !this.bunker.isConstructing) {
+                const bunkerDist = getDistance(bullet.x, bullet.y, this.bunker.x, this.bunker.y);
+                if (bunkerDist < this.bunker.radius) {
+                    this.bunker.takeDamage(bullet.damage);
+                    this.createOptimizedParticles(bullet.x, bullet.y, '#f44');
+                    this.poolManager.bulletPool.releaseBullet(bullet);
+                    return false;
+                }
+            }
+        }
+
+        return true; // Keep bullet
+    }
+
+    handleEnemyDeath(enemy, bullet) {
+        if (enemy instanceof Superboss) {
+            this.lastBossWave = this.wave;
+            this.score += 1000 * this.wave;
+
+            // Guaranteed multiple drops
+            for (let i = 0; i < 5; i++) {
+                const angle = (i / 5) * Math.PI * 2;
+                const dist = 50;
+                const x = enemy.x + Math.cos(angle) * dist;
+                const y = enemy.y + Math.sin(angle) * dist;
+
+                if (i < 2) {
+                    this.pickups.push(createUpgradePickup(x, y));
+                } else if (i === 2) {
+                    this.pickups.push({
+                        x, y, type: 'allyBoost', radius: 15,
+                        lifetime: 15000, created: Date.now()
+                    });
+                } else {
+                    this.pickups.push({
+                        x, y, type: 'health', radius: 10,
+                        lifetime: 10000, created: Date.now()
+                    });
+                }
+            }
+        } else {
+            this.score += enemy instanceof Tank ? 50 : 10;
+            const pickupChance = this.difficultyMultipliers[this.difficulty].pickupChance || 0.3;
+            if (Math.random() < pickupChance) {
+                this.spawnPickup(enemy.x, enemy.y);
+            }
+        }
+
+        if (bullet.explosive) {
+            const explosion = createExplosion(enemy.x, enemy.y);
+            this.applyExplosionDamage(explosion);
+        }
+    }
+
+    createOptimizedParticles(x, y, color, count = 5) {
+        // Use particle pool for better performance
+        const newParticles = this.poolManager.particlePool.createParticle(x, y, color, count);
+        // Add to global particles array
+        particles.push(...newParticles);
+    }
+
+    createOptimizedBullet(properties) {
+        // Use bullet pool for better performance
+        return this.poolManager.bulletPool.createBullet(properties);
+    }
+
+    // Helper method to convert old bullet arrays to pooled bullets
+    convertBulletsToPooled(bulletArray) {
+        return bulletArray.map(bulletProps => this.createOptimizedBullet(bulletProps));
     }
     
     updatePickups() {
@@ -992,14 +1088,74 @@ class GameManager {
     
     gameLoop() {
         if (!this.gameActive) return;
-        
+
+        // Start performance tracking
+        this.performanceManager.startFrame();
+
+        // Update spatial manager with current game state
+        this.spatialManager.update({
+            bullets: this.bullets,
+            enemies: this.enemies,
+            allies: this.allies,
+            walls: this.walls,
+            pickups: this.pickups,
+            player: this.player,
+            enemySquads: this.enemySquads,
+            turrets: this.turrets
+        });
+
+        // Update entity counts for performance monitoring
+        this.performanceManager.updateEntityCounts({
+            bullets: this.bullets.length,
+            enemies: this.enemies.length,
+            allies: this.allies.length,
+            particles: particles.length,
+            effects: 0, // Will be updated when effects are implemented
+            walls: this.walls.length,
+            pickups: this.pickups.length
+        });
+
         this.updateGame();
         this.render();
         this.updateDisplay();
-        
+
+        // End performance tracking
+        this.performanceManager.endFrame();
+
+        // Update performance UI if enabled
+        if (this.showPerformanceInfo) {
+            this.updatePerformanceUI();
+        }
+
+        // Auto-expand pools if needed
+        this.poolManager.autoExpand();
+
         this.animationId = requestAnimationFrame(() => this.gameLoop());
     }
-    
+
+    togglePerformanceInfo() {
+        this.showPerformanceInfo = !this.showPerformanceInfo;
+        const perfInfo = document.getElementById('performanceInfo');
+        if (perfInfo) {
+            perfInfo.style.display = this.showPerformanceInfo ? 'block' : 'none';
+        }
+    }
+
+    updatePerformanceUI() {
+        const stats = this.performanceManager.getStats();
+        const spatialStats = this.spatialManager.getStats();
+
+        const fpsElement = document.getElementById('fps');
+        const entityCountElement = document.getElementById('entityCount');
+        const qualityElement = document.getElementById('qualityLevel');
+        const collisionElement = document.getElementById('collisionChecks');
+
+        if (fpsElement) fpsElement.textContent = stats.fps;
+        if (entityCountElement) entityCountElement.textContent = stats.entityCounts.total;
+        if (qualityElement) qualityElement.textContent = stats.qualityLevel;
+        if (collisionElement) collisionElement.textContent = spatialStats.collisionChecksLastFrame;
+    }
+
     endGame() {
         this.gameActive = false;
         cancelAnimationFrame(this.animationId);
